@@ -49,6 +49,16 @@ function validStringList(arr: any, fields: string[]): any[] {
   return arr.filter(it => it && typeof it === 'object' && fields.every(f => f in it));
 }
 
+function reconcileWeaponClass(slots: import('./calc').Slot[], classId: string): void {
+  for (const slot of slots) {
+    if (!slot.weaponTypeId || slot.weaponTypeId === 'none') continue;
+    const wt = WEAPON_TYPES.find(w => w.id === slot.weaponTypeId);
+    if (wt?.allowedClasses && !wt.allowedClasses.includes(classId as any)) {
+      slot.weaponTypeId = 'none';
+    }
+  }
+}
+
 function serialToBuild(j: any): Build {
   if (!j || typeof j !== 'object') throw new Error('not an object');
   const knownClass = typeof j.classId === 'string' && CLASSES.some(c => c.id === j.classId);
@@ -72,6 +82,7 @@ function serialToBuild(j: any): Build {
     additiveLines: rehydrateLines(Array.isArray(j.additiveLines) ? j.additiveLines : undefined),
     snapshot: j.snapshot ? safeSerialToBuild(j.snapshot) : null,
   };
+  reconcileWeaponClass(out.slots, out.classId);
   return out;
 }
 
