@@ -35,7 +35,7 @@ function migrateSlots(slotsIn: any): import('./calc').Slot[] {
           .filter((a: any) => a && typeof a.bucket === 'string' && a.bucket in BUCKET_META)
           .map((a: any) => ({ bucket: a.bucket, value: validNumber(a.value, 0), ...(typeof a.label === 'string' ? { label: a.label } : {}) }))
       : [];
-    const isWeapon = def.id === 'wep1' || def.id === 'wep2';
+    const isWeapon = def.id.startsWith('wep');
     const weaponTypeId = isWeapon
       ? (() => {
           const rawId = typeof found.weaponTypeId === 'string' ? found.weaponTypeId : 'none';

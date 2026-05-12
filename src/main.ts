@@ -216,12 +216,19 @@ function nakedBaselineCard() {
 function slotsCard() {
   const card = sectionCard('Gear Slots',
     'Add affixes per piece. For weapon slots, pick the weapon type to auto-fill base damage and weapon speed.');
-  for (const slot of build.slots) card.append(slotBlock(slot));
+  const cls = classFor(build);
+  const weaponSlotCount = cls.weaponSlots;
+  for (const slot of build.slots) {
+    // Hide weapon slots beyond what this class can use
+    const wepIdx = slot.id.startsWith('wep') ? parseInt(slot.id.slice(3), 10) : 0;
+    if (wepIdx > 0 && wepIdx > weaponSlotCount) continue;
+    card.append(slotBlock(slot));
+  }
   return card;
 }
 
 function slotBlock(slot: Slot) {
-  const isWeapon = slot.id === 'wep1' || slot.id === 'wep2';
+  const isWeapon = slot.id.startsWith('wep');
   const wrap = el('div', { class: 'border border-zinc-800 rounded-lg p-3 mb-2' });
 
   const header = el('div', { class: 'flex items-center gap-3 mb-2 flex-wrap' });
@@ -407,48 +414,114 @@ function dpsCard() {
 
 // ---------- OUTPUT: Buckets ----------
 function bucketsCard() {
-  const card = sectionCard('Bucket Weights',
-    'Sorted by % gain from a typical fresh GA roll on each bucket. Top of list = highest leverage upgrade target.');
+  const card = sectionCard('Where to Spend Your Next Slot');
+  card.append(el('p', { class: 'text-xs text-zinc-400 mb-2' },
+    'Each row shows what one fresh greater-affix roll on that stat type would gain you, in % damage. Top of the list = best leverage right now.',
+  ));
+
   const c = calc(build);
   if (c.weaponDmg === 0) {
-    card.append(el('p', { class: 'text-xs text-zinc-500' }, 'Pick a weapon type to compute weights.'));
+    card.append(el('p', { class: 'text-xs text-amber-400' }, '⚠️ Pick a weapon type to compute weights.'));
     return card;
   }
   const refScenario = build.disableCrit
     ? presetScenarios().find(s => s.id === 'dot')!
     : presetScenarios().find(s => s.id === 'vuln_elite')!;
 
-  const rows: { name: string; value: number; gain: number }[] = [
-    { name: 'Crit Strike Damage [×]',   value: c.csdm,         gain: weightFor(build, 'CSDM',       BUCKET_META.CSDM.typicalRoll, refScenario) },
-    { name: 'Vulnerable Damage [×]',     value: c.vdm,          gain: weightFor(build, 'VDM',        BUCKET_META.VDM.typicalRoll, refScenario) },
-    { name: 'Damage over Time [×]',       value: c.dotm,         gain: weightFor(build, 'DOTM',       BUCKET_META.DOTM.typicalRoll, refScenario) },
-    { name: 'All / Element Damage [×]',   value: c.allm,         gain: weightFor(build, 'ALLM',       BUCKET_META.ALLM.typicalRoll, refScenario) },
-    { name: 'Main Stat',                  value: c.mainStatMult, gain: weightFor(build, 'MAINSTAT',   BUCKET_META.MAINSTAT.typicalRoll, refScenario) },
-    { name: 'Crit Strike Chance',         value: 1 + c.critChance, gain: weightFor(build, 'CRITCHANCE', BUCKET_META.CRITCHANCE.typicalRoll, refScenario) },
-    { name: 'Weapon Damage',              value: c.weaponDmg,    gain: weightFor(build, 'WEPDMG',     BUCKET_META.WEPDMG.typicalRoll, refScenario) },
-    { name: 'Skill Ranks',                value: 1 + c.totalSkillRanks / 10, gain: weightFor(build, 'SKILLRANK', BUCKET_META.SKILLRANK.typicalRoll, refScenario) },
+  type Row = { name: string; current: string; gain: number; explain: string };
+  const rows: Row[] = [
+    {
+      name: 'Crit Strike Damage [×]',
+      current: `bucket = ×${c.csdm.toFixed(2)}`,
+      gain: weightFor(build, 'CSDM', BUCKET_META.CSDM.typicalRoll, refScenario),
+      explain: `Adding a +25% [×]CSDM affix grows your CSDM bucket from ×${c.csdm.toFixed(2)} to ×${(c.csdm + 0.25*1.75).toFixed(2)}.`,
+    },
+    {
+      name: 'Vulnerable Damage [×]',
+      current: `bucket = ×${c.vdm.toFixed(2)}`,
+      gain: weightFor(build, 'VDM', BUCKET_META.VDM.typicalRoll, refScenario),
+      explain: `Adding a +14% [×]VDM affix grows your VDM bucket from ×${c.vdm.toFixed(2)} to ×${(c.vdm + 0.14*1.75).toFixed(2)} (only when target is vulnerable).`,
+    },
+    {
+      name: 'Damage over Time [×]',
+      current: `bucket = ×${c.dotm.toFixed(2)}`,
+      gain: weightFor(build, 'DOTM', BUCKET_META.DOTM.typicalRoll, refScenario),
+      explain: `Adding a +30% [×]DoT affix; only matters for DoT skills.`,
+    },
+    {
+      name: 'All / Element Damage [×]',
+      current: `bucket = ×${c.allm.toFixed(2)}`,
+      gain: weightFor(build, 'ALLM', BUCKET_META.ALLM.typicalRoll, refScenario),
+      explain: `Adding a +10% [×]All-Damage or matching elemental affix grows ALLM from ×${c.allm.toFixed(2)} to ×${(c.allm + 0.10*1.75).toFixed(2)}.`,
+    },
+    {
+      name: 'Main Stat',
+      current: `×${c.mainStatMult.toFixed(2)} (${c.mainStatSum} ${classFor(build).mainStat})`,
+      gain: weightFor(build, 'MAINSTAT', BUCKET_META.MAINSTAT.typicalRoll, refScenario),
+      explain: `Adding +180 ${classFor(build).mainStat} grows multiplier from ×${c.mainStatMult.toFixed(3)} to ×${(1 + (c.mainStatSum + 180*1.75)/classFor(build).divisor).toFixed(3)}.`,
+    },
+    {
+      name: 'Crit Strike Chance',
+      current: `${fmtPct(c.critChance, 1)}`,
+      gain: weightFor(build, 'CRITCHANCE', BUCKET_META.CRITCHANCE.typicalRoll, refScenario),
+      explain: `Adding +8.5% Crit Chance: ${c.critChance >= 1 ? 'already capped at 100% — no gain' : `crit rate ${fmtPct(c.critChance, 1)} → ${fmtPct(Math.min(1, c.critChance + 0.085*1.75), 1)}`}.`,
+    },
+    {
+      name: 'Weapon Damage',
+      current: `${fmtNum(c.weaponDmg)}`,
+      gain: weightFor(build, 'WEPDMG', BUCKET_META.WEPDMG.typicalRoll, refScenario),
+      explain: `Adding a +196 Weapon Damage temper grows from ${fmtNum(c.weaponDmg)} to ${fmtNum(c.weaponDmg + 196*1.75)} (multiplies everything).`,
+    },
+    {
+      name: 'Skill Ranks',
+      current: `${c.totalSkillRanks} ranks (×${c.skillCoef.toFixed(3)} skill coef)`,
+      gain: weightFor(build, 'SKILLRANK', BUCKET_META.SKILLRANK.typicalRoll, refScenario),
+      explain: `Adding +4 skill ranks bumps coef thanks to per-rank scaling and 5-rank step bonuses.`,
+    },
   ];
   rows.sort((a, b) => b.gain - a.gain);
 
-  card.append(el('p', { class: 'text-xs text-zinc-600 mb-2 italic' }, `Reference scenario: ${refScenario.label}`));
+  card.append(el('p', { class: 'text-xs text-zinc-600 italic mb-2' },
+    `Calculated against scenario: “${refScenario.label}” (change crit/DoT toggle to flip).`,
+  ));
 
   const table = el('table', { class: 'w-full text-sm' });
   table.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
-    el('th', { class: 'text-left py-1 font-normal' }, 'Bucket'),
-    el('th', { class: 'text-right py-1 font-normal' }, 'Current'),
-    el('th', { class: 'text-right py-1 font-normal' }, 'Weight'),
+    el('th', { class: 'text-left py-1 font-normal' }, 'Stat type'),
+    el('th', { class: 'text-right py-1 font-normal pl-2' }, '+1 GA roll → % more dmg'),
   )));
   const tb = el('tbody');
   for (const r of rows) {
     const isHot = r.gain > 0.05, isCold = r.gain < 0.01;
-    tb.append(el('tr', { class: 'border-b border-zinc-900' },
-      el('td', { class: 'py-1' }, r.name),
-      el('td', { class: 'py-1 text-right text-zinc-400 tabular-nums' }, typeof r.value === 'number' && r.value > 100 ? fmtNum(r.value) : (r.value).toFixed(3)),
-      el('td', { class: 'py-1 text-right tabular-nums ' + (isHot ? 'text-emerald-400 font-semibold' : isCold ? 'text-zinc-600' : 'text-amber-400') }, fmtPct(r.gain)),
-    ));
+    const gainCls = isHot ? 'text-emerald-400 font-semibold' : isCold ? 'text-zinc-600' : 'text-amber-400';
+    const tr = el('tr', { class: 'border-b border-zinc-900 align-top' });
+    tr.append(
+      el('td', { class: 'py-2' },
+        el('div', { class: 'text-zinc-200' }, r.name),
+        el('div', { class: 'text-xs text-zinc-500' }, r.current),
+        el('div', { class: 'text-xs text-zinc-600 mt-1' }, r.explain),
+      ),
+      el('td', { class: 'py-2 text-right tabular-nums pl-2 align-top ' + gainCls }, fmtPct(r.gain)),
+    );
+    tb.append(tr);
   }
   table.append(tb);
   card.append(table);
+
+  // Legend / how to read this
+  card.append(el('details', { class: 'mt-3 text-xs text-zinc-500' },
+    el('summary', { class: 'cursor-pointer text-zinc-400' }, 'How to read this'),
+    el('div', { class: 'mt-2 space-y-2 text-zinc-400' },
+      el('p', {}, 'Each “stat type” goes into its own ', el('strong', {}, 'bucket'), ' (a sum or multiplier in the damage formula). The full formula multiplies all buckets together. So adding to a small bucket gives more damage than adding the same amount to a big one.'),
+      el('p', {},
+        el('strong', {}, 'Example: '), 'If your Crit Damage [×] bucket is at ×2.0 and you add a +25% affix, it becomes ×2.44 (a 22% damage gain). If your Vulnerable [×] bucket is only at ×1.2 and you add the same +14% affix, it becomes ×1.45 (a 21% damage gain). Even though Vulnerable’s number is smaller, it costs less per affix to grow.',
+      ),
+      el('p', {},
+        el('strong', {}, 'TLDR:'), ' green/yellow rows on top = where to spend your next slot. Adding more affixes to the same bucket gives diminishing returns.',
+      ),
+    ),
+  ));
+
   return card;
 }
 

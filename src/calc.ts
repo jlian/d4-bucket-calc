@@ -3,15 +3,15 @@
 
 export type ClassId = 'Paladin' | 'Barbarian' | 'Druid' | 'Necromancer' | 'Rogue' | 'Sorcerer' | 'Spiritborn' | 'Warlock';
 
-export const CLASSES: { id: ClassId; mainStat: string; divisor: number }[] = [
-  { id: 'Paladin',      mainStat: 'Strength',     divisor: 800 },
-  { id: 'Barbarian',    mainStat: 'Strength',     divisor: 900 },
-  { id: 'Druid',        mainStat: 'Willpower',    divisor: 800 },
-  { id: 'Necromancer',  mainStat: 'Intelligence', divisor: 800 },
-  { id: 'Rogue',        mainStat: 'Dexterity',    divisor: 800 },
-  { id: 'Sorcerer',     mainStat: 'Intelligence', divisor: 800 },
-  { id: 'Spiritborn',   mainStat: 'Willpower',    divisor: 800 },
-  { id: 'Warlock',      mainStat: 'Intelligence', divisor: 800 },
+export const CLASSES: { id: ClassId; mainStat: string; divisor: number; weaponSlots: number }[] = [
+  { id: 'Paladin',      mainStat: 'Strength',     divisor: 800, weaponSlots: 2 },
+  { id: 'Barbarian',    mainStat: 'Strength',     divisor: 900, weaponSlots: 4 },
+  { id: 'Druid',        mainStat: 'Willpower',    divisor: 800, weaponSlots: 2 },
+  { id: 'Necromancer',  mainStat: 'Intelligence', divisor: 800, weaponSlots: 2 },
+  { id: 'Rogue',        mainStat: 'Dexterity',    divisor: 800, weaponSlots: 3 },
+  { id: 'Sorcerer',     mainStat: 'Intelligence', divisor: 800, weaponSlots: 2 },
+  { id: 'Spiritborn',   mainStat: 'Willpower',    divisor: 800, weaponSlots: 1 },
+  { id: 'Warlock',      mainStat: 'Intelligence', divisor: 800, weaponSlots: 2 },
 ];
 
 // ---- Weapon types ----
@@ -81,8 +81,11 @@ export const DEFAULT_SLOTS: Slot[] = [
   { id: 'amulet',  name: 'Amulet',  affixes: [] },
   { id: 'ring1',   name: 'Ring 1',  affixes: [] },
   { id: 'ring2',   name: 'Ring 2',  affixes: [] },
-  { id: 'wep1',    name: 'Weapon 1', weaponTypeId: 'none', affixes: [] },
-  { id: 'wep2',    name: 'Weapon 2 / Off-hand', weaponTypeId: 'none', affixes: [] },
+  // Weapon slots: visibility per class is filtered in main.ts (Barb=4, Rogue=3, Spiritborn=1, others=2)
+  { id: 'wep1',    name: 'Weapon 1 / Off-hand', weaponTypeId: 'none', affixes: [] },
+  { id: 'wep2',    name: 'Weapon 2',            weaponTypeId: 'none', affixes: [] },
+  { id: 'wep3',    name: 'Weapon 3 (Rogue/Barb)', weaponTypeId: 'none', affixes: [] },
+  { id: 'wep4',    name: 'Weapon 4 (Barb)',     weaponTypeId: 'none', affixes: [] },
 ];
 
 // ---- Additive lines (matches in-game UI order) ----
@@ -201,7 +204,7 @@ export function classFor(b: Build) { return CLASSES.find(c => c.id === b.classId
 export function computeWeaponDamage(b: Build): { dmg: number; speed: number; hasAny: boolean } {
   let dmg = 0, hasAny = false, speedSum = 0, speedCount = 0;
   for (const slot of b.slots) {
-    const isWeaponSlot = slot.id === 'wep1' || slot.id === 'wep2';
+    const isWeaponSlot = slot.id.startsWith('wep');
     if (slot.weaponTypeId) {
       const wt = weaponTypeById(slot.weaponTypeId);
       if (wt.baseDamage > 0) { dmg += wt.baseDamage; hasAny = true; }
@@ -211,7 +214,7 @@ export function computeWeaponDamage(b: Build): { dmg: number; speed: number; has
       for (const a of slot.affixes) if (a.bucket === 'WEPDMG') dmg += a.value;
     }
   }
-  // Barbarian dual-2H bonus
+  // Barbarian dual-2H bonus (legacy spreadsheet behavior; only meaningful when Barb has both wep1+wep2 as 2H weapons)
   if (b.classId === 'Barbarian' && hasAny) {
     const w1 = b.slots.find(s => s.id === 'wep1');
     const w2 = b.slots.find(s => s.id === 'wep2');
