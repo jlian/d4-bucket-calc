@@ -1,4 +1,6 @@
 import './style.css';
+import 'katex/dist/katex.min.css';
+import katex from 'katex';
 import {
   calc, classFor, CLASSES, BUCKET_META, BUCKET_ORDER,
   weightFor, scenarioDamage, scenarioDamageNoCrit, presetScenarios,
@@ -92,8 +94,8 @@ function mount() {
   const left = el('div', { class: 'space-y-6' });
   left.append(classSkillCard());
   left.append(nakedBaselineCard());
+  left.append(extraAdditiveCard()); // moved above gear
   left.append(slotsCard());
-  left.append(extraAdditiveCard());
   left.append(extraMultsCard());
   main.append(left);
 
@@ -466,42 +468,47 @@ function statsCard() {
   return card;
 }
 
-// ---------- Footer: formula card ----------
+// ---------- Footer: formula card (KaTeX rendered) ----------
 function formulaCard() {
-  const card = el('section', { class: 'bg-zinc-900/30 border border-zinc-800 rounded-lg p-5 text-sm text-zinc-300' });
+  const card = el('section', { class: 'bg-zinc-900/30 border border-zinc-800 rounded-lg p-6 text-sm text-zinc-300' });
   card.append(el('h2', { class: 'text-base font-bold text-amber-400 mb-3' }, 'How the formula works'));
-  card.append(el('p', { class: 'mb-3' },
-    'D4 damage is a single product of factors. Each factor (a "bucket") is either a sum of additive % values or a single multiplier. Per-affix value = ',
-    el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, 'Δ / current_bucket_size'),
-    ' — smaller buckets give bigger marginal gains.',
+  card.append(el('p', { class: 'mb-4' },
+    'D4 damage is a single product of factors. Each factor (a "bucket") is either a sum of additive % values or a single multiplier. The marginal value of an affix is approximately ',
+    katexInline('\\Delta / B'), ', where ', katexInline('B'), ' is the bucket\'s current value — smaller buckets give bigger gains.',
   ));
 
-  card.append(el('div', { class: 'bg-zinc-950 border border-zinc-800 rounded p-3 my-3 font-mono text-xs overflow-x-auto' },
-    el('div', { class: 'text-zinc-400' }, 'Damage =\n  AvgWeaponDmg'),
-    el('div', { class: 'text-zinc-400' }, '  × (1 + AdditiveDamage)'),
-    el('div', { class: 'text-zinc-400' }, `  × (1 + MainStat / ${classFor(build).divisor})`),
-    el('div', { class: 'text-zinc-400' }, '  × SkillCoefficient   ← rank-1 × (1 + 0.10·N + 0.05·⌊N/5⌋ step bonus)'),
-    el('div', { class: 'text-zinc-400' }, '  × ∏(GlobalMultipliers)   ← every [x] aspect/unique is its OWN factor'),
-    el('div', { class: 'text-zinc-400' }, '  × CSDM × 1.5             ← on critical strike'),
-    el('div', { class: 'text-zinc-400' }, '  × VDM × 1.2              ← on vulnerable target'),
-    el('div', { class: 'text-zinc-400' }, '  × DOTM                   ← for damage over time'),
-    el('div', { class: 'text-zinc-400' }, '  × (1 - EnemyDR)          ← 80% reduction = ×0.20 on level-appropriate enemy'),
-  ));
+  // Main formula
+  const divisor = classFor(build).divisor;
+  const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (\text{CSDM} \cdot 1.5)^{c} \cdot (\text{VDM} \cdot 1.2)^{v} \cdot \text{DOTM}^{d} \cdot (1 - R)`;
+  card.append(el('div', { class: 'my-4 flex justify-center overflow-x-auto' }, katexBlock(formula)));
 
-  card.append(el('h3', { class: 'font-semibold text-zinc-200 mt-4 mb-2' }, 'The buckets'));
-  const list = el('ul', { class: 'list-disc list-inside space-y-1 text-zinc-400' });
-  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Additive Damage:'), ' one big pool — every "+%" gear/paragon/temper additive line. Fills up fast and dilutes new affixes.'));
-  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Main Stat:'), ' (1 + Stat/800) — Barbarian uses 900. Asymptotic; can never reach 50% bonus from a "+50% main stat" affix.'));
-  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'CSDM / VDM / DOTM / ALLM:'), ' Lord of Hatred named buckets. Each is the SUM of all matching "[x] X% Damage Multiplier" affixes.'));
-  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Standalone [x]:'), ' aspects/uniques like Grandfather are each their own multiplicative factor.'));
-  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Crit baseline 50%:'), ' separate from CSDM, multiplied in.'));
-  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Vuln baseline 20%:'), ' separate from VDM, multiplied in.'));
-  card.append(list);
+  // Variable list
+  const varTable = el('table', { class: 'w-full text-xs my-3' });
+  const varRows: [string, string][] = [
+    ['W', 'Average weapon damage (a property of your equipped weapon)'],
+    ['A', 'Sum of all additive damage % (the giant pool: vuln, elemental, distant, etc., plus +%damage tempers/aspects)'],
+    ['S', `Total main stat (Strength/Dexterity/Intelligence/Willpower); divisor is ${divisor} for ${build.classId}`],
+    ['C', String.raw`Skill coefficient: \(\text{coef}_{1} \cdot \bigl(1 + 0.10\,(N - \lfloor N/5 \rfloor - 1) + 0.15\,\lfloor N/5 \rfloor\bigr)\) where \(N\) = total skill ranks (step bonus every 5 ranks)`],
+    ['M_i', 'Each standalone [x] aspect/unique multiplier (Grandfather, Godslayer, glyph legendary mults, etc.)'],
+    ['CSDM', 'Critical Strike Damage Multiplier bucket: 1 + sum of all "[x] X% Critical Strike Damage Multiplier" affixes'],
+    ['VDM', 'Vulnerable Damage Multiplier bucket: 1 + sum of all "[x] X% Vulnerable Damage Multiplier" affixes'],
+    ['DOTM', 'Damage over Time Multiplier bucket: 1 + sum of all "[x] X% Damage over Time Multiplier" affixes'],
+    ['R', 'Enemy damage reduction; level-appropriate enemy = 80% (so factor is 0.20)'],
+    ['c, v, d', 'Indicator variables (1 if the hit crits / target is vulnerable / hit is DoT, else 0)'],
+  ];
+  for (const [k, v] of varRows) {
+    varTable.append(el('tr', { class: 'border-b border-zinc-900' },
+      el('td', { class: 'py-1 pr-3 align-top w-16' }, katexInline(k)),
+      el('td', { class: 'py-1 text-zinc-400' }, v as any),
+    ));
+  }
+  card.append(varTable);
 
   card.append(el('h3', { class: 'font-semibold text-zinc-200 mt-4 mb-2' }, 'Min/max heuristic'));
   card.append(el('p', { class: 'text-zinc-400 mb-3' },
-    'For two buckets at sizes A and B, the same affix is ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, 'B / A'),
-    ' times more valuable in A than B. Spread your multipliers — products are maximized when factors are balanced.',
+    'For two buckets at sizes ', katexInline('A'), ' and ', katexInline('B'),
+    ', the same affix is ', katexInline('B / A'), ' times more valuable in the smaller one. Spread your multipliers — a product is maximized when its factors are balanced (',
+    Object.assign(el('a', { href: 'https://en.wikipedia.org/wiki/Inequality_of_arithmetic_and_geometric_means', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'AM-GM inequality' }), ').',
   ));
 
   card.append(el('p', { class: 'text-xs text-zinc-500 mt-4' },
@@ -517,6 +524,17 @@ function formulaCard() {
   ));
 
   return card;
+}
+
+function katexInline(tex: string): HTMLElement {
+  const span = el('span', { class: 'inline-block' });
+  katex.render(tex, span, { throwOnError: false, displayMode: false });
+  return span;
+}
+function katexBlock(tex: string): HTMLElement {
+  const div = el('div', { class: 'inline-block' });
+  katex.render(tex, div, { throwOnError: false, displayMode: true });
+  return div;
 }
 
 // ---------- header buttons ----------

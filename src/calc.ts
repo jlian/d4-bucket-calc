@@ -105,26 +105,19 @@ const ifDistant = (s: ScenarioConditions) => !!s.distant;
 const ifElites = (s: ScenarioConditions) => !!s.elites;
 const ifCC = (s: ScenarioConditions) => !!s.cc;
 const ifHealthy = (s: ScenarioConditions) => !!s.healthy;
-const ifPoisoned = (s: ScenarioConditions) => !!s.poisoned;
 
 // Note: in-game order. (No imbuement: it's a Rogue-only line and users can add it via Extra Additive.)
 export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
   { id: 'crit',         label: 'Critical Strike Damage', value: 0, applies: ifCrit, isCritOnly: true },
   { id: 'vulnerable',   label: 'Vulnerable Damage',      value: 0, applies: ifVuln },
   { id: 'all',          label: 'All Damage',             value: 0, applies: alwaysOn },
-  { id: 'fire',         label: 'Damage with Fire',       value: 0, applies: alwaysOn },
-  { id: 'lightning',    label: 'Damage with Lightning',  value: 0, applies: alwaysOn },
-  { id: 'cold',         label: 'Damage with Cold',       value: 0, applies: alwaysOn },
-  { id: 'holy',         label: 'Damage with Holy',       value: 0, applies: alwaysOn },
-  { id: 'poison',       label: 'Damage with Poison',     value: 0, applies: alwaysOn },
-  { id: 'shadow',       label: 'Damage with Shadow',     value: 0, applies: alwaysOn },
+  { id: 'primaryElem',  label: 'Damage with [Element]',  value: 0, applies: alwaysOn },
   { id: 'ultimate',     label: 'Damage with Ultimate',   value: 0, applies: alwaysOn },
   { id: 'close',        label: 'Damage vs Close',        value: 0, applies: ifClose },
   { id: 'distant',      label: 'Damage vs Distant',      value: 0, applies: ifDistant },
   { id: 'elites',       label: 'Damage vs Elites',       value: 0, applies: ifElites },
   { id: 'cc',           label: 'Damage vs Crowd Controlled', value: 0, applies: ifCC },
   { id: 'healthy',      label: 'Damage vs Healthy',      value: 0, applies: ifHealthy },
-  { id: 'poisoned',     label: 'Damage vs Poisoned',     value: 0, applies: ifPoisoned },
 ];
 
 // Helper that clones default lines without losing function fields (structuredClone can't clone functions)
@@ -342,7 +335,6 @@ export function presetScenarios(): Scenario[] {
     { id: 'healthy',   label: 'vs Healthy',                 conditions: { healthy: true } },
     { id: 'distant',   label: 'vs Distant',                 conditions: { distant: true } },
     { id: 'close',     label: 'vs Close',                   conditions: { close: true } },
-    { id: 'poisoned',  label: 'vs Poisoned',                conditions: { poisoned: true } },
     { id: 'dot',       label: 'DoT tick',                   conditions: {}, isDot: true },
   ];
 }
