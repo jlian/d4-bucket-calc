@@ -22,16 +22,56 @@ function buildToSerial(b: Build): any {
   return { ...b, additiveLines: b.additiveLines.map(lineToSerial), snapshot: b.snapshot ? buildToSerial(b.snapshot) : null };
 }
 
+function migrateSlots(slotsIn: any): import('./calc').Slot[] {
+  const defaults = DEFAULT_BUILD.slots;
+  const incoming = Array.isArray(slotsIn) ? slotsIn : [];
+  return defaults.map(def => {
+    const found = incoming.find(s => s && s.id === def.id);
+    if (!found) return { ...def, affixes: [] };
+    const affixes = Array.isArray(found.affixes) ? found.affixes.filter((a: any) => a && typeof a.bucket === 'string' && typeof a.value === 'number') : [];
+    const isWeapon = def.id === 'wep1' || def.id === 'wep2';
+    const weaponTypeId = isWeapon ? (typeof found.weaponTypeId === 'string' ? found.weaponTypeId : 'none') : undefined;
+    return { id: def.id, name: def.name, affixes, ...(isWeapon ? { weaponTypeId } : {}) };
+  });
+}
+
+function validNumber(n: any, fallback = 0): number {
+  const x = typeof n === 'number' && isFinite(n) ? n : (typeof n === 'string' ? parseFloat(n) : NaN);
+  return isFinite(x) ? x : fallback;
+}
+
+function validStringList(arr: any, fields: string[]): any[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(it => it && typeof it === 'object' && fields.every(f => f in it));
+}
+
 function serialToBuild(j: any): Build {
-  return {
+  if (!j || typeof j !== 'object') throw new Error('not an object');
+  const out: Build = {
     ...DEFAULT_BUILD,
-    ...j,
-    slots: j.slots ?? DEFAULT_BUILD.slots,
-    extraMultipliers: j.extraMultipliers ?? [],
-    extraAdditive: j.extraAdditive ?? [],
-    additiveLines: rehydrateLines(j.additiveLines),
-    snapshot: j.snapshot ? serialToBuild(j.snapshot) : null,
+    classId: typeof j.classId === 'string' ? j.classId : DEFAULT_BUILD.classId,
+    baseMainStat: validNumber(j.baseMainStat, DEFAULT_BUILD.baseMainStat),
+    extraMainStat: validNumber(j.extraMainStat, 0),
+    skillName: typeof j.skillName === 'string' ? j.skillName : DEFAULT_BUILD.skillName,
+    skillCoefL1: validNumber(j.skillCoefL1, DEFAULT_BUILD.skillCoefL1),
+    skillRanks: validNumber(j.skillRanks, DEFAULT_BUILD.skillRanks),
+    extraSkillRanks: validNumber(j.extraSkillRanks, 0),
+    baseCritChance: validNumber(j.baseCritChance, DEFAULT_BUILD.baseCritChance),
+    attackSpeedBonus: validNumber(j.attackSpeedBonus, 0),
+    weaponSpeedOverride: j.weaponSpeedOverride == null ? null : validNumber(j.weaponSpeedOverride, 0),
+    disableCrit: !!j.disableCrit,
+    enemyDR: validNumber(j.enemyDR, 0.2),
+    slots: migrateSlots(j.slots),
+    extraMultipliers: validStringList(j.extraMultipliers, ['label', 'value']).map((m: any) => ({ label: String(m.label ?? ''), value: validNumber(m.value, 0) })),
+    extraAdditive: validStringList(j.extraAdditive, ['label', 'value']).map((m: any) => ({ label: String(m.label ?? ''), value: validNumber(m.value, 0) })),
+    additiveLines: rehydrateLines(Array.isArray(j.additiveLines) ? j.additiveLines : undefined),
+    snapshot: j.snapshot ? safeSerialToBuild(j.snapshot) : null,
   };
+  return out;
+}
+
+function safeSerialToBuild(j: any): Build | null {
+  try { return serialToBuild(j); } catch { return null; }
 }
 
 export function saveLocal(b: Build) {
@@ -70,7 +110,10 @@ export function exportJson(b: Build): string {
   return JSON.stringify(buildToSerial(b), null, 2);
 }
 export function importJson(text: string): Build | null {
-  try { return serialToBuild(JSON.parse(text)); } catch { return null; }
+  try {
+    const parsed = JSON.parse(text);
+    return serialToBuild(parsed);
+  } catch { return null; }
 }
 
 export function loadInitialBuild(): Build {

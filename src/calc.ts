@@ -192,11 +192,15 @@ export function classFor(b: Build) { return CLASSES.find(c => c.id === b.classId
 export function computeWeaponDamage(b: Build): { dmg: number; speed: number; hasAny: boolean } {
   let dmg = 0, hasAny = false, speedSum = 0, speedCount = 0;
   for (const slot of b.slots) {
-    if (!slot.weaponTypeId) continue;
-    const wt = weaponTypeById(slot.weaponTypeId);
-    if (wt.baseDamage > 0) { dmg += wt.baseDamage; hasAny = true; }
-    if (wt.speed > 0) { speedSum += wt.speed; speedCount++; }
-    for (const a of slot.affixes) if (a.bucket === 'WEPDMG') dmg += a.value;
+    const isWeaponSlot = slot.id === 'wep1' || slot.id === 'wep2';
+    if (slot.weaponTypeId) {
+      const wt = weaponTypeById(slot.weaponTypeId);
+      if (wt.baseDamage > 0) { dmg += wt.baseDamage; hasAny = true; }
+      if (wt.speed > 0) { speedSum += wt.speed; speedCount++; }
+    }
+    if (isWeaponSlot) {
+      for (const a of slot.affixes) if (a.bucket === 'WEPDMG') dmg += a.value;
+    }
   }
   // Barbarian dual-2H bonus
   if (b.classId === 'Barbarian' && hasAny) {
