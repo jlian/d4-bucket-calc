@@ -1,5 +1,5 @@
 import pako from 'pako';
-import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, cloneDefaultLines, BUCKET_META, CLASSES, type Build, type AdditiveLine } from './calc';
+import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, cloneDefaultLines, BUCKET_META, CLASSES, WEAPON_TYPES, type Build, type AdditiveLine } from './calc';
 
 const STORAGE_KEY = 'd4bc.build';
 
