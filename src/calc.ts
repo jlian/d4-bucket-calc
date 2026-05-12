@@ -321,19 +321,19 @@ export function weightFor(b: Build, bucket: Bucket, typical: number, scenario: S
 
 // ---- Bucket display ----
 export const BUCKET_META: Record<Bucket, { label: string; isPercent: boolean; typicalRoll: number }> = {
-  CSDM:       { label: '[x] Crit Strike Damage Mult', isPercent: true,  typicalRoll: 0.25 },
-  VDM:        { label: '[x] Vulnerable Damage Mult',   isPercent: true,  typicalRoll: 0.14 },
-  DOTM:       { label: '[x] DoT Damage Mult',          isPercent: true,  typicalRoll: 0.30 },
-  ALLM:       { label: '[x] All/Elemental Damage Mult',isPercent: true,  typicalRoll: 0.10 },
-  NONPHYS:    { label: '[x] Non-Physical Mult',        isPercent: true,  typicalRoll: 0.24 },
-  ADDITIVE:   { label: '+ Additive Damage',            isPercent: true,  typicalRoll: 0.40 },
-  CRITADD:    { label: '+ Crit Damage (additive)',     isPercent: true,  typicalRoll: 0.40 },
-  MAINSTAT:   { label: '+ Main Stat',                  isPercent: false, typicalRoll: 180 },
-  WEPDMG:     { label: '+ Weapon Damage Roll',         isPercent: false, typicalRoll: 196 },
-  GEM:        { label: 'Weapon Gem (sums into ALLM)', isPercent: true,  typicalRoll: 0.12 },
-  CRITCHANCE: { label: '+ Crit Chance',                isPercent: true,  typicalRoll: 0.085 },
-  SKILLRANK:  { label: '+ Skill Ranks',                isPercent: false, typicalRoll: 4 },
-  EXTRAMULT:  { label: '[x] Standalone Multiplier',    isPercent: true,  typicalRoll: 0.20 },
+  CSDM:       { label: '[×] Critical Strike Damage Multiplier', isPercent: true,  typicalRoll: 0.25 },
+  VDM:        { label: '[×] Vulnerable Damage Multiplier',      isPercent: true,  typicalRoll: 0.14 },
+  DOTM:       { label: '[×] Damage over Time Multiplier',        isPercent: true,  typicalRoll: 0.30 },
+  ALLM:       { label: '[×] All / Elemental Damage Multiplier',  isPercent: true,  typicalRoll: 0.10 },
+  NONPHYS:    { label: '[×] Non-Physical Damage',                 isPercent: true,  typicalRoll: 0.24 },
+  ADDITIVE:   { label: '+ Additive Damage (any flavor)',         isPercent: true,  typicalRoll: 0.40 },
+  CRITADD:    { label: '+ Critical Strike Damage (additive)',    isPercent: true,  typicalRoll: 0.40 },
+  MAINSTAT:   { label: '+ Main Stat (Str/Dex/Int/Will)',         isPercent: false, typicalRoll: 180 },
+  WEPDMG:     { label: '+ Weapon Damage Roll',                   isPercent: false, typicalRoll: 196 },
+  GEM:        { label: 'Weapon Gem (sums into ALL/ELEMENT bucket)', isPercent: true,  typicalRoll: 0.12 },
+  CRITCHANCE: { label: '+ Critical Strike Chance',               isPercent: true,  typicalRoll: 0.085 },
+  SKILLRANK:  { label: '+ Skill Ranks',                          isPercent: false, typicalRoll: 4 },
+  EXTRAMULT:  { label: '[×] Standalone Multiplier (aspect/unique)', isPercent: true,  typicalRoll: 0.20 },
 };
 
 export const BUCKET_ORDER: Bucket[] = ['CSDM','VDM','DOTM','ALLM','NONPHYS','ADDITIVE','CRITADD','MAINSTAT','WEPDMG','GEM','CRITCHANCE','SKILLRANK','EXTRAMULT'];

@@ -419,14 +419,14 @@ function bucketsCard() {
     : presetScenarios().find(s => s.id === 'vuln_elite')!;
 
   const rows: { name: string; value: number; gain: number }[] = [
-    { name: 'CSDM',     value: c.csdm,        gain: weightFor(build, 'CSDM',       BUCKET_META.CSDM.typicalRoll, refScenario) },
-    { name: 'VDM',      value: c.vdm,         gain: weightFor(build, 'VDM',        BUCKET_META.VDM.typicalRoll, refScenario) },
-    { name: 'DOTM',     value: c.dotm,        gain: weightFor(build, 'DOTM',       BUCKET_META.DOTM.typicalRoll, refScenario) },
-    { name: 'ALLM',     value: c.allm,        gain: weightFor(build, 'ALLM',       BUCKET_META.ALLM.typicalRoll, refScenario) },
-    { name: 'Main Stat',value: c.mainStatMult, gain: weightFor(build, 'MAINSTAT', BUCKET_META.MAINSTAT.typicalRoll, refScenario) },
-    { name: 'Crit %',   value: 1 + c.critChance, gain: weightFor(build, 'CRITCHANCE', BUCKET_META.CRITCHANCE.typicalRoll, refScenario) },
-    { name: 'Weapon',   value: c.weaponDmg,    gain: weightFor(build, 'WEPDMG',    BUCKET_META.WEPDMG.typicalRoll, refScenario) },
-    { name: 'Skill Rk', value: 1 + c.totalSkillRanks / 10, gain: weightFor(build, 'SKILLRANK', BUCKET_META.SKILLRANK.typicalRoll, refScenario) },
+    { name: 'Crit Strike Damage [×]',   value: c.csdm,         gain: weightFor(build, 'CSDM',       BUCKET_META.CSDM.typicalRoll, refScenario) },
+    { name: 'Vulnerable Damage [×]',     value: c.vdm,          gain: weightFor(build, 'VDM',        BUCKET_META.VDM.typicalRoll, refScenario) },
+    { name: 'Damage over Time [×]',       value: c.dotm,         gain: weightFor(build, 'DOTM',       BUCKET_META.DOTM.typicalRoll, refScenario) },
+    { name: 'All / Element Damage [×]',   value: c.allm,         gain: weightFor(build, 'ALLM',       BUCKET_META.ALLM.typicalRoll, refScenario) },
+    { name: 'Main Stat',                  value: c.mainStatMult, gain: weightFor(build, 'MAINSTAT',   BUCKET_META.MAINSTAT.typicalRoll, refScenario) },
+    { name: 'Crit Strike Chance',         value: 1 + c.critChance, gain: weightFor(build, 'CRITCHANCE', BUCKET_META.CRITCHANCE.typicalRoll, refScenario) },
+    { name: 'Weapon Damage',              value: c.weaponDmg,    gain: weightFor(build, 'WEPDMG',     BUCKET_META.WEPDMG.typicalRoll, refScenario) },
+    { name: 'Skill Ranks',                value: 1 + c.totalSkillRanks / 10, gain: weightFor(build, 'SKILLRANK', BUCKET_META.SKILLRANK.typicalRoll, refScenario) },
   ];
   rows.sort((a, b) => b.gain - a.gain);
 
@@ -463,10 +463,10 @@ function statsCard() {
     ['Main Stat Mult', `×${c.mainStatMult.toFixed(3)}`],
     ['Crit Chance', fmtPct(c.critChance)],
     ['Skill Coef (eff.)', fmtPct(c.skillCoef)],
-    ['CSDM', `×${c.csdm.toFixed(3)}`],
-    ['VDM', `×${c.vdm.toFixed(3)}`],
-    ['DOTM', `×${c.dotm.toFixed(3)}`],
-    ['ALLM', `×${c.allm.toFixed(3)}`],
+    ['CSDM bucket (Crit Strike Damage ×)', `×${c.csdm.toFixed(3)}`],
+    ['VDM bucket (Vulnerable Damage ×)',  `×${c.vdm.toFixed(3)}`],
+    ['DOTM bucket (Damage over Time ×)',  `×${c.dotm.toFixed(3)}`],
+    ['All/Element Damage bucket',          `×${c.allm.toFixed(3)}`],
     ['Extra Mults', `×${c.extraMultProduct.toFixed(3)}`],
     ['Enemy DR', fmtPct(1 - build.enemyDR) + ' (fixed)'],
   ];
