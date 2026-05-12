@@ -1,15 +1,14 @@
 import './style.css';
 import {
   calc, classFor, CLASSES, BUCKET_META, BUCKET_ORDER,
-  weightFor, scenarioDamage, presetScenarios,
+  weightFor, scenarioDamage, scenarioDamageNoCrit, presetScenarios,
   WEAPON_TYPES,
-  type Build, type Bucket, type Slot, type AdditiveLine,
+  type Build, type Bucket, type Slot,
 } from './calc';
 import { loadInitialBuild, persist, exportJson, importJson } from './state';
 
 let build: Build = loadInitialBuild();
 
-// ---------- format ----------
 const fmtPct = (n: number, digits = 2) => (n * 100).toFixed(digits) + '%';
 const fmtNum = (n: number, digits = 0) => n.toLocaleString('en-US', { maximumFractionDigits: digits });
 const fmtBigNum = (n: number) => {
@@ -21,7 +20,6 @@ const fmtBigNum = (n: number) => {
 };
 const stripTrailingZero = (s: string) => s.includes('.') ? s.replace(/\.?0+$/, '') : s;
 
-// ---------- DOM helpers ----------
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, any> = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   for (const k in attrs) {
@@ -42,7 +40,6 @@ function sectionCard(title: string, subtitle?: string) {
   return card;
 }
 
-// ---------- stable inputs (don't re-render on input) ----------
 function pctInput(getValue: () => number, setValue: (v: number) => void, opts: { step?: number; w?: string } = {}) {
   const inp = el('input', { type: 'number', step: opts.step ?? 1, class: inputCls() + ' ' + (opts.w ?? 'w-20') + ' text-right' }) as HTMLInputElement;
   inp.value = stripTrailingZero((getValue() * 100).toFixed(2));
@@ -80,11 +77,9 @@ function field(label: string, control: HTMLElement) {
   return wrap;
 }
 
-// ---------- mount + refresh ----------
 function afterInput() {
   persist(build);
   refreshOutputs();
-  refreshAdditiveSum();
 }
 
 function mount() {
@@ -106,6 +101,11 @@ function mount() {
   main.append(right);
   refreshOutputs();
   persist(build);
+
+  // Footer
+  const footer = el('footer', { class: 'max-w-6xl mx-auto p-4 mt-8 border-t border-zinc-900' });
+  footer.append(formulaCard());
+  root.append(footer);
 }
 
 function refreshOutputs() {
@@ -116,25 +116,23 @@ function refreshOutputs() {
   right.append(dpsCard());
   right.append(bucketsCard());
   right.append(statsCard());
-  right.append(creditsCard());
 }
 
-function refreshAdditiveSum() {
-  const span = document.getElementById('additive-sum');
-  if (!span) return;
-  const eff = build.additiveLines.filter(l => !l.conditional).reduce((a, l) => a + l.value, 0)
-    + build.extraAdditive.reduce((a, l) => a + l.value, 0);
-  span.textContent = fmtPct(eff, 1);
-}
-
-// ---------- header ----------
+// ---------- Header ----------
 function renderHeader() {
   return el('header', { class: 'border-b border-zinc-800 px-4 py-3 sticky top-0 bg-zinc-950/95 backdrop-blur z-10' },
     el('div', { class: 'max-w-6xl mx-auto flex flex-wrap items-center gap-3 justify-between' },
-      el('div', { class: 'flex items-center gap-2' },
+      el('div', { class: 'flex items-center gap-3' },
         el('span', { class: 'text-2xl' }, '⚔️'),
-        el('h1', { class: 'text-lg font-bold' }, 'D4 Bucket Calc'),
-        el('span', { class: 'text-xs text-zinc-500 hidden sm:inline' }, 'Season 13 · Lord of Hatred'),
+        el('div', {},
+          el('h1', { class: 'text-lg font-bold leading-tight' }, 'D4 Damage Calc'),
+          el('div', { class: 'text-[10px] text-zinc-500 leading-tight' },
+            'Calculator design + math by ',
+            Object.assign(el('a', { href: 'https://www.youtube.com/@avarilyn', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Avarilyn' }),
+            ' · web port by ',
+            Object.assign(el('a', { href: 'https://github.com/jlian', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'jlian' }),
+          ),
+        ),
       ),
       el('div', { class: 'flex items-center gap-2 flex-wrap' },
         snapshotBtn(), importBtn(), exportBtn(), copyShareBtn(), resetBtn(),
@@ -146,7 +144,7 @@ function renderHeader() {
 // ---------- Card 1: Class & Skill ----------
 function classSkillCard() {
   const cls = classFor(build);
-  const card = sectionCard('Class & Skill', 'Set once per build.');
+  const card = sectionCard('Class & Skill');
   const grid = el('div', { class: 'grid grid-cols-2 gap-3' });
 
   const classSel = el('select', { class: inputCls() + ' w-full' }) as HTMLSelectElement;
@@ -159,11 +157,10 @@ function classSkillCard() {
   grid.append(field('Class', classSel));
 
   grid.append(field('Skill name', textInput(() => build.skillName, v => build.skillName = v, { w: 'w-full', placeholder: 'e.g. Holy Bolt' })));
-  grid.append(field('Skill Coef (rank 1, e.g. 0.45)', numInput(() => build.skillCoefL1, v => build.skillCoefL1 = v, { step: 0.001, w: 'w-full' })));
-  grid.append(field('Total Skill Ranks (1-base + extras)', numInput(() => build.skillRanks, v => build.skillRanks = v, { w: 'w-full' })));
+  grid.append(field('Skill Coef % (rank 1, e.g. 45)', pctInput(() => build.skillCoefL1, v => build.skillCoefL1 = v, { step: 0.5, w: 'w-full' })));
+  grid.append(field('Total Skill Ranks', numInput(() => build.skillRanks, v => build.skillRanks = v, { w: 'w-full' })));
   grid.append(field(`Base ${cls.mainStat} (no gear)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
   grid.append(field(`Extra ${cls.mainStat} (charms)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
-  grid.append(field('Enemy DR (% damage reduction)', pctInput(() => 1 - build.enemyDR, v => build.enemyDR = 1 - v, { w: 'w-full', step: 1 })));
 
   const checkWrap = el('label', { class: 'flex items-center gap-2 col-span-2 text-sm cursor-pointer mt-1' });
   const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
@@ -173,66 +170,37 @@ function classSkillCard() {
   grid.append(checkWrap);
 
   card.append(grid);
-
-  card.append(el('details', { class: 'mt-3 text-xs text-zinc-500' },
-    el('summary', { class: 'cursor-pointer text-zinc-400' }, 'Help'),
-    el('div', { class: 'mt-2 space-y-1' },
-      el('div', {}, '• Skill Coef rank 1: enable advanced tooltips, set your skill to 1 point only, hover to see e.g. "(45%)" — enter 0.45.'),
-      el('div', {}, '• Total Skill Ranks: include base 5 + glyph/aspect/unique +ranks (e.g. base 5 + 6 from charms + 8 from Eldrin = 19).'),
-      el('div', {}, '• Step bonuses: every multiple of 5 ranks gets a 5% boost.'),
-      el('div', {}, '• Base Main Stat: strip gear, read the number on character sheet (paragon + glyphs only).'),
-      el('div', {}, '• Extra Main Stat: from charms/talisman that grant flat all-stats.'),
-      el('div', {}, '• Enemy DR: 80% for level-appropriate dummy. Drop to 0% for true raw output.'),
-    ),
-  ));
   return card;
 }
 
 // ---------- Card 2: Naked Baseline ----------
 function nakedBaselineCard() {
   const card = sectionCard('Naked Baseline (Strip Your Gear)',
-    'Strip gear and copy these from your character sheet. Hover each in-game additive line and use the BOTTOM number.');
+    'Open Character Sheet → Offensive tab. Hover each line and use the BOTTOM number ("from items and Paragon"). Order matches in-game.');
 
-  // Crit chance (naked)
   const critRow = el('div', { class: 'mb-3 flex items-center gap-2' });
-  critRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Naked Crit Chance %'));
+  critRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Critical Strike Chance'));
   critRow.append(pctInput(() => build.baseCritChance, v => build.baseCritChance = v, { w: 'w-24', step: 0.5 }));
   critRow.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
   card.append(critRow);
 
-  // Always-on additive lines
-  card.append(el('h4', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-2 mb-2' }, 'Always-on additive lines'));
-  card.append(additiveGrid(build.additiveLines.filter(l => !l.conditional)));
-
-  // Conditional additive lines
-  card.append(el('h4', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-4 mb-2' }, 'Conditional additive lines'));
-  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'These only apply in certain scenarios. Output panel shows damage per scenario, no uptime guesswork.'));
-  card.append(additiveGrid(build.additiveLines.filter(l => l.conditional)));
-
-  card.append(el('div', { class: 'mt-3 pt-2 border-t border-zinc-800 flex justify-between text-xs' },
-    el('span', { class: 'text-zinc-500' }, 'Always-on additive sum:'),
-    el('span', { id: 'additive-sum', class: 'text-amber-400 font-mono tabular-nums' }, '0.00%'),
-  ));
-  setTimeout(refreshAdditiveSum, 0);
-  return card;
-}
-
-function additiveGrid(lines: AdditiveLine[]) {
+  // All additive lines, in-game order, no split
   const grid = el('div', { class: 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2' });
-  for (const line of lines) {
+  for (const line of build.additiveLines) {
     const row = el('div', { class: 'flex items-center gap-2' });
     row.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, line.label));
     row.append(pctInput(() => line.value, v => line.value = v, { w: 'w-24' }));
     row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
     grid.append(row);
   }
-  return grid;
+  card.append(grid);
+  return card;
 }
 
 // ---------- Card 3: Gear Slots ----------
 function slotsCard() {
   const card = sectionCard('Gear Slots',
-    'Add affixes per piece. For weapon slots, pick the weapon type to auto-fill base damage. Use % values for percent affixes.');
+    'Add affixes per piece. For weapon slots, pick the weapon type to auto-fill base damage and weapon speed.');
   for (const slot of build.slots) card.append(slotBlock(slot));
   return card;
 }
@@ -241,14 +209,13 @@ function slotBlock(slot: Slot) {
   const isWeapon = slot.id === 'wep1' || slot.id === 'wep2';
   const wrap = el('div', { class: 'border border-zinc-800 rounded-lg p-3 mb-2' });
 
-  // Header: name + weapon-type picker (if weapon) + add button
   const header = el('div', { class: 'flex items-center gap-3 mb-2 flex-wrap' });
   header.append(el('h3', { class: 'font-semibold text-zinc-200 mr-auto' }, slot.name));
 
   if (isWeapon) {
     const sel = el('select', { class: inputCls() + ' text-xs' }) as HTMLSelectElement;
     for (const wt of WEAPON_TYPES) {
-      const opt = el('option', { value: wt.id }, wt.label + (wt.baseDamage ? ` (${wt.baseDamage})` : ''));
+      const opt = el('option', { value: wt.id }, wt.label + (wt.baseDamage ? ` (${wt.baseDamage} @ ${wt.speed.toFixed(2)}/s)` : ''));
       if (wt.id === (slot.weaponTypeId ?? 'none')) opt.setAttribute('selected', '');
       sel.append(opt);
     }
@@ -261,15 +228,12 @@ function slotBlock(slot: Slot) {
   header.append(addBtn);
   wrap.append(header);
 
-  if (slot.affixes.length === 0) {
-    wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
-  }
+  if (slot.affixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
 
   slot.affixes.forEach((a, idx) => {
     const row = el('div', { class: 'flex gap-2 mb-1.5 items-center' });
     const sel = el('select', { class: inputCls() + ' flex-1' }) as HTMLSelectElement;
     for (const b of BUCKET_ORDER) {
-      // Hide WEPDMG / GEM on non-weapon slots for clarity
       if (!isWeapon && (b === 'WEPDMG' || b === 'GEM')) continue;
       const opt = el('option', { value: b }, BUCKET_META[b].label);
       if (b === a.bucket) opt.setAttribute('selected', '');
@@ -294,13 +258,13 @@ function slotBlock(slot: Slot) {
   return wrap;
 }
 
-// ---------- Extra Additive ----------
+// ---------- Extra Additive (free-form) ----------
 function extraAdditiveCard() {
-  const card = sectionCard('Extra Additive (Catch-all)',
-    'For "+%" damage that doesn\'t fit a standard line: skill-tag bonuses, conditional additive from aspects/uniques, etc. Treated as always-on.');
+  const card = sectionCard('Extra Additive Damage',
+    'Free-form list for any "+%" damage that isn\'t in the standard list (e.g., skill-tag bonuses from aspects).');
   build.extraAdditive.forEach((m, idx) => {
     const row = el('div', { class: 'flex gap-2 mb-2 items-center' });
-    row.append(textInput(() => m.label, v => m.label = v, { w: 'flex-1', placeholder: 'e.g. dmg with shouts' }));
+    row.append(textInput(() => m.label, v => m.label = v, { w: 'flex-1', placeholder: 'Name' }));
     row.append(pctInput(() => m.value, v => m.value = v, { w: 'w-24' }));
     row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
     const del = el('button', { class: 'text-zinc-500 hover:text-red-400 px-2' }, '✕');
@@ -344,38 +308,47 @@ function scenariosCard() {
   }
 
   const scenarios = presetScenarios();
-  // For DoT builds, swap the crit ones for DoT
+  // For DoT builds, hide non-DoT non-condition rows
   const filtered = build.disableCrit
-    ? scenarios.filter(s => !s.scenario.isCrit)
-    : scenarios.filter(s => s.id !== 'dot');
+    ? scenarios.filter(s => s.isDot || Object.keys(s.conditions).length > 0 || s.id === 'plain')
+    : scenarios;
 
   const tbl = el('table', { class: 'w-full text-sm' });
   tbl.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
     el('th', { class: 'text-left py-1 font-normal' }, 'Scenario'),
-    el('th', { class: 'text-right py-1 font-normal' }, 'Hit'),
+    el('th', { class: 'text-right py-1 font-normal' }, 'Avg dmg'),
   )));
   const tb = el('tbody');
-  for (const ns of filtered) {
-    const dmg = scenarioDamage(build, ns.scenario);
+
+  // Always include "Plain (no crit)" first as a reference
+  if (!build.disableCrit) {
+    const plainNoCrit = scenarioDamageNoCrit(build, scenarios.find(s => s.id === 'plain')!);
     tb.append(el('tr', { class: 'border-b border-zinc-900' },
-      el('td', { class: 'py-1' }, ns.label),
+      el('td', { class: 'py-1 text-zinc-400' }, 'Plain (no crit, ref)'),
+      el('td', { class: 'py-1 text-right tabular-nums text-zinc-400 font-mono' }, fmtBigNum(plainNoCrit)),
+    ));
+  }
+  for (const s of filtered) {
+    const dmg = scenarioDamage(build, s);
+    tb.append(el('tr', { class: 'border-b border-zinc-900' },
+      el('td', { class: 'py-1' }, s.label),
       el('td', { class: 'py-1 text-right tabular-nums text-amber-400 font-mono' }, fmtBigNum(dmg)),
     ));
   }
   tbl.append(tb);
   card.append(tbl);
 
-  // Snapshot delta
   if (build.snapshot) {
-    const refScenario = filtered[0].scenario;
+    const refScenario = filtered[0];
     const cur = scenarioDamage(build, refScenario);
-    const snap = scenarioDamage({ ...build.snapshot, snapshot: null } as Build, refScenario);
+    const snapBuild = build.snapshot as Build;
+    const snap = scenarioDamage({ ...snapBuild, snapshot: null } as Build, refScenario);
     if (snap > 0) {
       const delta = cur / snap - 1;
       const sign = delta >= 0 ? '+' : '';
       const cls = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-zinc-500';
       card.append(el('div', { class: 'mt-3 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs' },
-        el('span', { class: 'text-zinc-500' }, `📌 ${filtered[0].label} vs snapshot:`),
+        el('span', { class: 'text-zinc-500' }, `📌 "${refScenario.label}" vs snapshot:`),
         el('span', { class: cls + ' font-bold tabular-nums' }, sign + fmtPct(delta, 2)),
       ));
     }
@@ -383,63 +356,66 @@ function scenariosCard() {
   return card;
 }
 
-// ---------- OUTPUT: DPS section ----------
+// ---------- OUTPUT: DPS ----------
 function dpsCard() {
-  const card = sectionCard('DPS (optional)');
-  card.append(el('p', { class: 'text-xs text-zinc-500 mb-3' },
-    'Enter your fully-geared attack speed and pick a scenario to convert per-hit to DPS. Note: many skills have attack-speed breakpoints — only use this for skills that scale linearly (e.g. Dance of Knives, basic attacks).',
-  ));
-  const row = el('div', { class: 'flex items-center gap-2' });
-  row.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Attack Speed %'));
-  row.append(pctInput(() => build.attackSpeed, v => build.attackSpeed = v, { w: 'w-24', step: 1 }));
-  row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
-  card.append(row);
+  const card = sectionCard('DPS (Attack Speed)',
+    'Equip your gear, then read your "Attack Speed Bonus" from the Offensive tab. Multiplies hits/sec.');
 
-  if (build.attackSpeed > 0) {
-    const c = calc(build);
-    if (c.weaponDmg > 0) {
-      // Approximate DPS using "Plain crit" or fallback
-      const refScenario = build.disableCrit
-        ? presetScenarios().find(s => s.id === 'dot')!.scenario
-        : presetScenarios().find(s => s.id === 'crit')!.scenario;
-      const dmg = scenarioDamage(build, refScenario);
-      const dps = dmg * (1 + build.attackSpeed);
-      card.append(el('div', { class: 'mt-3 flex items-baseline justify-between' },
-        el('span', { class: 'text-zinc-400 text-sm' }, build.disableCrit ? 'DoT DPS' : 'Crit DPS'),
-        el('span', { class: 'text-xl font-bold text-amber-400' }, fmtBigNum(dps)),
-      ));
-    }
+  const c = calc(build);
+  const wsRow = el('div', { class: 'mb-2 flex items-center gap-2' });
+  wsRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Weapon Speed (auto)'));
+  const ws = el('span', { class: 'text-xs text-zinc-300 font-mono' }, c.weaponSpeed > 0 ? c.weaponSpeed.toFixed(2) + ' /s' : '— pick weapon');
+  wsRow.append(ws);
+  card.append(wsRow);
+
+  const asRow = el('div', { class: 'mb-2 flex items-center gap-2' });
+  asRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Attack Speed Bonus'));
+  asRow.append(pctInput(() => build.attackSpeedBonus, v => build.attackSpeedBonus = v, { w: 'w-24', step: 1 }));
+  asRow.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
+  card.append(asRow);
+
+  if (c.weaponDmg > 0 && c.effectiveAttackRate > 0) {
+    const refScenario = build.disableCrit
+      ? presetScenarios().find(s => s.id === 'dot')!
+      : presetScenarios().find(s => s.id === 'plain')!;
+    const dmg = scenarioDamage(build, refScenario);
+    const dps = dmg * c.effectiveAttackRate;
+    card.append(el('div', { class: 'mt-3 flex items-baseline justify-between' },
+      el('span', { class: 'text-zinc-400 text-sm' }, `DPS (${refScenario.label})`),
+      el('span', { class: 'text-xl font-bold text-amber-400' }, fmtBigNum(dps)),
+    ));
+    card.append(el('div', { class: 'text-xs text-zinc-500 mt-1' }, `Effective rate: ${c.effectiveAttackRate.toFixed(2)} hits/s`));
   }
+  card.append(el('p', { class: 'text-xs text-zinc-600 mt-2 italic' }, 'Note: many skills have AS breakpoints — only use this for skills that scale linearly (e.g., basic attacks, Dance of Knives).'));
   return card;
 }
 
 // ---------- OUTPUT: Buckets ----------
 function bucketsCard() {
-  const card = sectionCard('Buckets — Find Your Smallest',
-    'Sorted by Weight (% gain from a typical fresh GA roll). Top of list = highest leverage.');
+  const card = sectionCard('Bucket Weights',
+    'Sorted by % gain from a typical fresh GA roll on each bucket. Top of list = highest leverage upgrade target.');
   const c = calc(build);
   if (c.weaponDmg === 0) {
     card.append(el('p', { class: 'text-xs text-zinc-500' }, 'Pick a weapon type to compute weights.'));
     return card;
   }
-
-  // Use first preset scenario for bucket weight comparison
   const refScenario = build.disableCrit
-    ? presetScenarios().find(s => s.id === 'dot')!.scenario
-    : presetScenarios().find(s => s.id === 'vuln_crit')!.scenario;
+    ? presetScenarios().find(s => s.id === 'dot')!
+    : presetScenarios().find(s => s.id === 'vuln_elite')!;
 
   const rows: { name: string; value: number; gain: number }[] = [
     { name: 'CSDM',     value: c.csdm,        gain: weightFor(build, 'CSDM',       BUCKET_META.CSDM.typicalRoll, refScenario) },
     { name: 'VDM',      value: c.vdm,         gain: weightFor(build, 'VDM',        BUCKET_META.VDM.typicalRoll, refScenario) },
     { name: 'DOTM',     value: c.dotm,        gain: weightFor(build, 'DOTM',       BUCKET_META.DOTM.typicalRoll, refScenario) },
     { name: 'ALLM',     value: c.allm,        gain: weightFor(build, 'ALLM',       BUCKET_META.ALLM.typicalRoll, refScenario) },
-    { name: 'Additive', value: 1 + c.alwaysOnAdditive, gain: weightFor(build, 'ADDITIVE', BUCKET_META.ADDITIVE.typicalRoll, refScenario) },
     { name: 'Main Stat',value: c.mainStatMult, gain: weightFor(build, 'MAINSTAT', BUCKET_META.MAINSTAT.typicalRoll, refScenario) },
     { name: 'Crit %',   value: 1 + c.critChance, gain: weightFor(build, 'CRITCHANCE', BUCKET_META.CRITCHANCE.typicalRoll, refScenario) },
     { name: 'Weapon',   value: c.weaponDmg,    gain: weightFor(build, 'WEPDMG',    BUCKET_META.WEPDMG.typicalRoll, refScenario) },
     { name: 'Skill Rk', value: 1 + c.totalSkillRanks / 10, gain: weightFor(build, 'SKILLRANK', BUCKET_META.SKILLRANK.typicalRoll, refScenario) },
   ];
   rows.sort((a, b) => b.gain - a.gain);
+
+  card.append(el('p', { class: 'text-xs text-zinc-600 mb-2 italic' }, `Reference scenario: ${refScenario.label}`));
 
   const table = el('table', { class: 'w-full text-sm' });
   table.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
@@ -449,8 +425,7 @@ function bucketsCard() {
   )));
   const tb = el('tbody');
   for (const r of rows) {
-    const isHot = r.gain > 0.05;
-    const isCold = r.gain < 0.01;
+    const isHot = r.gain > 0.05, isCold = r.gain < 0.01;
     tb.append(el('tr', { class: 'border-b border-zinc-900' },
       el('td', { class: 'py-1' }, r.name),
       el('td', { class: 'py-1 text-right text-zinc-400 tabular-nums' }, typeof r.value === 'number' && r.value > 100 ? fmtNum(r.value) : (r.value).toFixed(3)),
@@ -464,19 +439,21 @@ function bucketsCard() {
 
 function statsCard() {
   const c = calc(build);
-  const card = sectionCard('Stats');
+  const card = sectionCard('Internal Stats');
   const stats: [string, string][] = [
     ['Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : '— pick weapon'],
+    ['Weapon Speed', c.weaponSpeed ? c.weaponSpeed.toFixed(2) + '/s' : '—'],
+    ['Effective Rate', c.effectiveAttackRate ? c.effectiveAttackRate.toFixed(2) + '/s' : '—'],
     ['Main Stat Sum', fmtNum(c.mainStatSum)],
     ['Main Stat Mult', `×${c.mainStatMult.toFixed(3)}`],
     ['Crit Chance', fmtPct(c.critChance)],
-    ['Skill Coef (eff.)', c.skillCoef.toFixed(4)],
+    ['Skill Coef (eff.)', fmtPct(c.skillCoef)],
     ['CSDM', `×${c.csdm.toFixed(3)}`],
     ['VDM', `×${c.vdm.toFixed(3)}`],
     ['DOTM', `×${c.dotm.toFixed(3)}`],
     ['ALLM', `×${c.allm.toFixed(3)}`],
-    ['Always-on Add', `×${(1 + c.alwaysOnAdditive).toFixed(3)}`],
     ['Extra Mults', `×${c.extraMultProduct.toFixed(3)}`],
+    ['Enemy DR', fmtPct(1 - build.enemyDR) + ' (fixed)'],
   ];
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
@@ -489,16 +466,56 @@ function statsCard() {
   return card;
 }
 
-function creditsCard() {
-  const card = el('div', { class: 'text-xs text-zinc-500 p-3 border-t border-zinc-900' });
-  card.append(el('p', {}, 'Math ported from Avarilyn\'s spreadsheet.'));
-  card.append(el('p', { class: 'mt-1' },
-    Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=as8y_zGlPrs', target: '_blank', class: 'underline hover:text-amber-400' }), { textContent: 'How-to Video' }),
-    ' · ',
-    Object.assign(el('a', { href: 'https://docs.google.com/spreadsheets/d/1qM6XySdTPuoCF4pEndWihBy0oONayRwZZ9WePkn_TFU/', target: '_blank', class: 'underline hover:text-amber-400' }), { textContent: 'Original Sheet' }),
-    ' · ',
-    Object.assign(el('a', { href: 'https://github.com/jlian/d4-bucket-calc', target: '_blank', class: 'underline hover:text-amber-400' }), { textContent: 'GitHub' }),
+// ---------- Footer: formula card ----------
+function formulaCard() {
+  const card = el('section', { class: 'bg-zinc-900/30 border border-zinc-800 rounded-lg p-5 text-sm text-zinc-300' });
+  card.append(el('h2', { class: 'text-base font-bold text-amber-400 mb-3' }, 'How the formula works'));
+  card.append(el('p', { class: 'mb-3' },
+    'D4 damage is a single product of factors. Each factor (a "bucket") is either a sum of additive % values or a single multiplier. Per-affix value = ',
+    el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, 'Δ / current_bucket_size'),
+    ' — smaller buckets give bigger marginal gains.',
   ));
+
+  card.append(el('div', { class: 'bg-zinc-950 border border-zinc-800 rounded p-3 my-3 font-mono text-xs overflow-x-auto' },
+    el('div', { class: 'text-zinc-400' }, 'Damage =\n  AvgWeaponDmg'),
+    el('div', { class: 'text-zinc-400' }, '  × (1 + AdditiveDamage)'),
+    el('div', { class: 'text-zinc-400' }, `  × (1 + MainStat / ${classFor(build).divisor})`),
+    el('div', { class: 'text-zinc-400' }, '  × SkillCoefficient   ← rank-1 × (1 + 0.10·N + 0.05·⌊N/5⌋ step bonus)'),
+    el('div', { class: 'text-zinc-400' }, '  × ∏(GlobalMultipliers)   ← every [x] aspect/unique is its OWN factor'),
+    el('div', { class: 'text-zinc-400' }, '  × CSDM × 1.5             ← on critical strike'),
+    el('div', { class: 'text-zinc-400' }, '  × VDM × 1.2              ← on vulnerable target'),
+    el('div', { class: 'text-zinc-400' }, '  × DOTM                   ← for damage over time'),
+    el('div', { class: 'text-zinc-400' }, '  × (1 - EnemyDR)          ← 80% reduction = ×0.20 on level-appropriate enemy'),
+  ));
+
+  card.append(el('h3', { class: 'font-semibold text-zinc-200 mt-4 mb-2' }, 'The buckets'));
+  const list = el('ul', { class: 'list-disc list-inside space-y-1 text-zinc-400' });
+  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Additive Damage:'), ' one big pool — every "+%" gear/paragon/temper additive line. Fills up fast and dilutes new affixes.'));
+  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Main Stat:'), ' (1 + Stat/800) — Barbarian uses 900. Asymptotic; can never reach 50% bonus from a "+50% main stat" affix.'));
+  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'CSDM / VDM / DOTM / ALLM:'), ' Lord of Hatred named buckets. Each is the SUM of all matching "[x] X% Damage Multiplier" affixes.'));
+  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Standalone [x]:'), ' aspects/uniques like Grandfather are each their own multiplicative factor.'));
+  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Crit baseline 50%:'), ' separate from CSDM, multiplied in.'));
+  list.append(el('li', {}, el('strong', { class: 'text-zinc-300' }, 'Vuln baseline 20%:'), ' separate from VDM, multiplied in.'));
+  card.append(list);
+
+  card.append(el('h3', { class: 'font-semibold text-zinc-200 mt-4 mb-2' }, 'Min/max heuristic'));
+  card.append(el('p', { class: 'text-zinc-400 mb-3' },
+    'For two buckets at sizes A and B, the same affix is ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, 'B / A'),
+    ' times more valuable in A than B. Spread your multipliers — products are maximized when factors are balanced.',
+  ));
+
+  card.append(el('p', { class: 'text-xs text-zinc-500 mt-4' },
+    'Methodology, formulas, weapon damage values, and stacking rules: ',
+    Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=2GKhCdxxqp8', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Avarilyn — Damage Calculation Explained with Proof' }),
+    ' / ',
+    Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=as8y_zGlPrs', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'How to Optimize Damage' }),
+    ' / ',
+    Object.assign(el('a', { href: 'https://docs.google.com/spreadsheets/d/1qM6XySdTPuoCF4pEndWihBy0oONayRwZZ9WePkn_TFU/', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Original Sheet' }),
+    ' · ',
+    Object.assign(el('a', { href: 'https://github.com/jlian/d4-bucket-calc', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'GitHub source' }),
+    '.',
+  ));
+
   return card;
 }
 
