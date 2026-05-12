@@ -36,19 +36,21 @@ export function decodeHash(hash: string): Build | null {
 }
 
 function mergeWithDefault(b: any): Build {
-  // Migrate older `additivePool` (single number) to per-line list
-  let additiveLines = b.additiveLines;
-  if (!additiveLines && typeof b.additivePool === 'number') {
-    additiveLines = structuredClone(DEFAULT_ADDITIVE_LINES);
-    additiveLines[0].value = b.additivePool; // dump into Vulnerable line as a placeholder
+  // Migrate old stored builds where lines lacked `conditional`
+  let lines = b.additiveLines as any[] | undefined;
+  if (lines && lines.length && lines[0].conditional === undefined) {
+    const lookup = Object.fromEntries(DEFAULT_ADDITIVE_LINES.map(d => [d.id, d.conditional]));
+    lines = lines.map(l => ({ ...l, conditional: lookup[l.id] ?? false }));
   }
-  if (!additiveLines) additiveLines = structuredClone(DEFAULT_ADDITIVE_LINES);
+  if (!lines) lines = structuredClone(DEFAULT_ADDITIVE_LINES);
   return {
     ...DEFAULT_BUILD,
     ...b,
     slots: b.slots ?? DEFAULT_BUILD.slots,
     extraMultipliers: b.extraMultipliers ?? [],
-    additiveLines,
+    extraAdditive: b.extraAdditive ?? [],
+    scenario: b.scenario ?? DEFAULT_BUILD.scenario,
+    additiveLines: lines,
     snapshot: b.snapshot ?? null,
   };
 }

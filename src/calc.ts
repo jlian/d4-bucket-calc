@@ -1,5 +1,5 @@
 // Damage formula port from Avarilyn's "ALL CLASSES" sheet (D4 Season 13 Lord of Hatred).
-// All percentages stored as decimals (50% = 0.5).
+// All percentages stored as decimals (50% = 0.5) internally; UI shows them as %.
 
 export type ClassId = 'Paladin' | 'Barbarian' | 'Druid' | 'Necromancer' | 'Rogue' | 'Sorcerer' | 'Spiritborn' | 'Warlock';
 
@@ -14,55 +14,58 @@ export const CLASSES: { id: ClassId; mainStat: string; divisor: number }[] = [
   { id: 'Warlock',      mainStat: 'Intelligence', divisor: 800 },
 ];
 
-// Per-line additive damage inputs (the naked baseline list)
-export interface AdditiveLine {
+// ---- Weapon types ----
+export interface WeaponType {
   id: string;
   label: string;
-  value: number;   // decimal e.g. 1.42 = 142%
-  uptime: number;  // 0..1, default 1
+  baseDamage: number;       // average damage at 900 ipower, fully masterworked
+  hands: 1 | 2;
+  category: 'melee' | 'ranged';
 }
 
-export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
-  { id: 'vulnerable',   label: 'Vulnerable Damage',     value: 0, uptime: 1 },
-  { id: 'all',          label: 'All Damage',            value: 0, uptime: 1 },
-  { id: 'primaryElem',  label: 'Primary Element',       value: 0, uptime: 1 },
-  { id: 'dot',          label: 'Damage over Time',      value: 0, uptime: 1 },
-  { id: 'close',        label: 'Damage to Close',       value: 0, uptime: 1 },
-  { id: 'distant',      label: 'Damage to Distant',     value: 0, uptime: 1 },
-  { id: 'elites',       label: 'Damage to Elites',      value: 0, uptime: 1 },
-  { id: 'cc',           label: 'Damage to CC’d',         value: 0, uptime: 1 },
-  { id: 'healthy',      label: 'Damage to Healthy',     value: 0, uptime: 1 },
-  { id: 'trapped',      label: 'Damage to Trapped',     value: 0, uptime: 1 },
-  { id: 'imbued',       label: 'Imbued Damage',         value: 0, uptime: 1 },
-  { id: 'overpower',    label: 'Overpower Damage',      value: 0, uptime: 1 },
+export const WEAPON_TYPES: WeaponType[] = [
+  { id: 'none',        label: '(none)',                   baseDamage: 0,    hands: 1, category: 'melee' },
+  { id: '1h_sword',    label: '1H Sword/Mace/Axe',        baseDamage: 1884, hands: 1, category: 'melee' },
+  { id: '1h_dagger',   label: '1H Dagger/Flail/Wand/Focus', baseDamage: 1728, hands: 1, category: 'melee' },
+  { id: 'shield',      label: 'Shield (off-hand)',         baseDamage: 0,    hands: 1, category: 'melee' },
+  { id: '2h_mace',     label: '2H Mace/Axe',               baseDamage: 4607, hands: 2, category: 'melee' },
+  { id: '2h_sword',    label: '2H Sword/Glaive',           baseDamage: 4146, hands: 2, category: 'melee' },
+  { id: '2h_polearm',  label: '2H Polearm',                baseDamage: 4607, hands: 2, category: 'melee' },
+  { id: '2h_bow',      label: '2H Bow',                    baseDamage: 3768, hands: 2, category: 'ranged' },
+  { id: '2h_xbow',     label: '2H Crossbow',               baseDamage: 4607, hands: 2, category: 'ranged' },
+  { id: '2h_qstaff',   label: '2H Quarterstaff',           baseDamage: 3768, hands: 2, category: 'melee' },
 ];
 
-// Bucket identifiers
+export function weaponTypeById(id: string): WeaponType {
+  return WEAPON_TYPES.find(w => w.id === id) ?? WEAPON_TYPES[0];
+}
+
+// ---- Buckets ----
 export type Bucket =
   | 'CSDM'      // [x] Critical Strike Damage Multiplier (sum-then-mult)
   | 'VDM'       // [x] Vulnerable Damage Multiplier
   | 'DOTM'      // [x] DoT Multiplier
-  | 'ALLM'      // [x] All Damage Multiplier (also bundles elemental/phys mult)
+  | 'ALLM'      // [x] All Damage / Elemental / Physical Multiplier (bundled per Avarilyn)
   | 'NONPHYS'   // (folded into ALLM bucket per sheet)
-  | 'ADDITIVE'  // single big additive bucket
-  | 'CRITADD'   // additive that ONLY applies on crit (e.g. +Crit Damage from amulet/temper)
+  | 'ADDITIVE'  // single big additive bucket (joins always-on or conditional based on label)
+  | 'CRITADD'   // additive that ONLY applies on crit (e.g. +Crit Damage on amulet/temper)
   | 'MAINSTAT'  // adds to main stat sum
-  | 'WEPDMG'    // adds to weapon damage
+  | 'WEPDMG'    // adds to weapon damage roll
+  | 'GEM'       // weapon-socketed gem damage (additive %)
   | 'CRITCHANCE'
   | 'SKILLRANK'
   | 'EXTRAMULT'; // standalone aspects/uniques like Grandfather (each its own factor)
 
-// One affix on a gear slot
 export interface Affix {
   bucket: Bucket;
   value: number;          // decimal (or absolute for MAINSTAT/WEPDMG/SKILLRANK)
-  label?: string;         // optional human label, e.g. "Vuln Mult (amulet)"
+  label?: string;
 }
 
-// One gear slot — just a list of affixes
 export interface Slot {
   id: string;
   name: string;
+  weaponTypeId?: string;  // for weapon slots, picks base damage
   affixes: Affix[];
 }
 
@@ -75,27 +78,54 @@ export const DEFAULT_SLOTS: Slot[] = [
   { id: 'amulet',  name: 'Amulet',  affixes: [] },
   { id: 'ring1',   name: 'Ring 1',  affixes: [] },
   { id: 'ring2',   name: 'Ring 2',  affixes: [] },
-  { id: 'wep1',    name: 'Weapon 1', affixes: [] },
-  { id: 'wep2',    name: 'Weapon 2 / Off-hand', affixes: [] },
+  { id: 'wep1',    name: 'Weapon 1', weaponTypeId: 'none', affixes: [] },
+  { id: 'wep2',    name: 'Weapon 2 / Off-hand', weaponTypeId: 'none', affixes: [] },
 ];
 
+// ---- Additive lines: always-on vs conditional ----
+export interface AdditiveLine {
+  id: string;
+  label: string;
+  value: number;       // decimal e.g. 1.42 = 142%
+  conditional: boolean; // true = applies only when scenario flag is on
+}
+
+export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
+  // Always on
+  { id: 'all',          label: 'All Damage',              value: 0, conditional: false },
+  { id: 'primaryElem',  label: 'Primary Element',         value: 0, conditional: false },
+  { id: 'dot',          label: 'Damage over Time',        value: 0, conditional: false },
+  { id: 'imbued',       label: 'Imbued Damage',           value: 0, conditional: false },
+  { id: 'overpower',    label: 'Overpower Damage',        value: 0, conditional: false },
+  // Conditional (toggled per scenario)
+  { id: 'vulnerable',   label: 'Vulnerable Damage',       value: 0, conditional: true },
+  { id: 'close',        label: 'Damage to Close',         value: 0, conditional: true },
+  { id: 'distant',      label: 'Damage to Distant',       value: 0, conditional: true },
+  { id: 'elites',       label: 'Damage to Elites',        value: 0, conditional: true },
+  { id: 'cc',           label: 'Damage to CC\u2019d',      value: 0, conditional: true },
+  { id: 'healthy',      label: 'Damage to Healthy',       value: 0, conditional: true },
+  { id: 'trapped',      label: 'Damage to Trapped',       value: 0, conditional: true },
+];
+
+// ---- Build ----
 export interface Build {
   classId: ClassId;
-  baseMainStat: number;       // main stat from naked character (paragon + base)
-  extraMainStat: number;      // from charms/talisman
-  additiveLines: AdditiveLine[]; // per-line additive damage inputs (naked baseline)
-  skillCoefL1: number;        // e.g. 0.45
-  skillRanks: number;         // e.g. 15
-  extraSkillRanks: number;    // from items/effects
-  baseCritChance: number;     // decimal (paragon + base, no items)
-  attackSpeed: number;        // decimal, multiplier on DPS rate; 0 = ignored
-  disableCrit: boolean;       // true = DoT build, ignore crit
-  enemyDR: number;            // 0.20 = training dummy default (after 80% reduction)
-  weaponBaseDmg: number;      // average weapon damage (the big number)
+  baseMainStat: number;
+  extraMainStat: number;
+  additiveLines: AdditiveLine[];
+  extraAdditive: { label: string; value: number }[]; // catch-all additive entries
+  skillName: string;
+  skillCoefL1: number;
+  skillRanks: number;
+  extraSkillRanks: number;
+  baseCritChance: number;     // naked baseline crit chance (decimal)
+  attackSpeed: number;        // fully-geared AS for DPS readout (decimal)
+  disableCrit: boolean;       // DoT build flag
+  enemyDR: number;            // 0.20 = 80% reduction (training dummy)
   slots: Slot[];
-  // Standalone unique/aspect multipliers (each its own factor)
-  extraMultipliers: { label: string; value: number }[]; // value as decimal e.g. 0.30 = 30%[x]
-  // Comparison snapshot (frozen build object for delta display)
+  extraMultipliers: { label: string; value: number }[];
+  // Conditional toggles for the "active scenario" output (mainly for the buckets calc)
+  scenario: { vulnerable: boolean; close: boolean; distant: boolean; elites: boolean; cc: boolean; healthy: boolean; trapped: boolean };
   snapshot?: Build | null;
 }
 
@@ -104,6 +134,8 @@ export const DEFAULT_BUILD: Build = {
   baseMainStat: 800,
   extraMainStat: 0,
   additiveLines: structuredClone(DEFAULT_ADDITIVE_LINES),
+  extraAdditive: [],
+  skillName: 'Main Skill',
   skillCoefL1: 0.45,
   skillRanks: 5,
   extraSkillRanks: 0,
@@ -111,38 +143,29 @@ export const DEFAULT_BUILD: Build = {
   attackSpeed: 0,
   disableCrit: false,
   enemyDR: 0.2,
-  weaponBaseDmg: 3000,
   slots: structuredClone(DEFAULT_SLOTS),
   extraMultipliers: [],
+  scenario: { vulnerable: true, close: false, distant: false, elites: false, cc: false, healthy: false, trapped: false },
   snapshot: null,
 };
 
-// ---------------- Calc ----------------
-
+// ---- Calc ----
 export interface Calc {
-  // Buckets
   mainStatSum: number;
-  mainStatMult: number;       // (1 + sum/divisor)
-  additiveTotal: number;      // 1 + sum  (NON-CRIT)
-  additiveCritTotal: number;  // 1 + sum + critOnlyAdditive
-  csdm: number;               // 1 + sum
+  mainStatMult: number;
+  alwaysOnAdditive: number;     // decimal, sum of always-on additive lines + slot ADDITIVE + extraAdditive + GEM
+  csdm: number;                 // 1 + sum
   vdm: number;
   dotm: number;
   allm: number;
-  critChance: number;         // capped at 1
+  critChance: number;           // capped at 1
   totalSkillRanks: number;
-  skillCoef: number;          // includes step bonuses
+  skillCoef: number;
   weaponDmg: number;
-  extraMultProduct: number;   // product of all standalone uniques
-
-  // Damage products
-  nonCritDmg: number;
-  critDmg: number;
-  avgDmg: number;
-  dotDmg: number;
+  extraMultProduct: number;
 }
 
-function sum(slots: Slot[], bucket: Bucket): number {
+function sumAffixes(slots: Slot[], bucket: Bucket): number {
   let s = 0;
   for (const slot of slots) for (const a of slot.affixes) if (a.bucket === bucket) s += a.value;
   return s;
@@ -152,101 +175,161 @@ export function classFor(b: Build) {
   return CLASSES.find(c => c.id === b.classId)!;
 }
 
+// Compute weapon damage from slot weapon types + Wep affixes
+export function computeWeaponDamage(b: Build): number {
+  let total = 0;
+  let hasAny = false;
+  for (const slot of b.slots) {
+    if (!slot.weaponTypeId) continue;
+    const wt = weaponTypeById(slot.weaponTypeId);
+    if (wt.id !== 'none' && wt.baseDamage > 0) {
+      total += wt.baseDamage;
+      hasAny = true;
+    }
+    // +Weapon Damage Roll affixes on weapon slots only
+    for (const a of slot.affixes) if (a.bucket === 'WEPDMG') total += a.value;
+  }
+  if (!hasAny) return 0;
+  // Barbarian dual-2H bonus: if both slots are 2H, multiply by 2
+  if (b.classId === 'Barbarian') {
+    const w1 = b.slots.find(s => s.id === 'wep1');
+    const w2 = b.slots.find(s => s.id === 'wep2');
+    if (w1 && w2 && weaponTypeById(w1.weaponTypeId ?? 'none').hands === 2 && weaponTypeById(w2.weaponTypeId ?? 'none').hands === 2) {
+      total *= 2;
+    }
+  }
+  return total;
+}
+
 export function calc(b: Build): Calc {
   const cls = classFor(b);
 
-  const mainStatSum = b.baseMainStat + b.extraMainStat + sum(b.slots, 'MAINSTAT');
+  const mainStatSum = b.baseMainStat + b.extraMainStat + sumAffixes(b.slots, 'MAINSTAT');
   const mainStatMult = 1 + mainStatSum / cls.divisor;
 
-  // Crit chance
-  let critChance = b.baseCritChance + sum(b.slots, 'CRITCHANCE');
+  let critChance = b.baseCritChance + sumAffixes(b.slots, 'CRITCHANCE');
   if (b.disableCrit) critChance = 0;
-  if (critChance > 1) critChance = 1;
-  if (critChance < 0) critChance = 0;
+  critChance = Math.max(0, Math.min(1, critChance));
 
-  // Skill ranks + coefficient
-  const totalSkillRanks = b.skillRanks + b.extraSkillRanks + sum(b.slots, 'SKILLRANK');
-  const N = totalSkillRanks;
-  // Step formula: base × (1 + 0.10×(N - floor(N/5) - 1) + 0.15×floor(N/5))
-  // Guard for N=0: produce base × (1 - 0.10) ≈ underflow; clamp to base when N<=0.
+  const totalSkillRanks = b.skillRanks + b.extraSkillRanks + sumAffixes(b.slots, 'SKILLRANK');
   let skillCoef = b.skillCoefL1;
+  const N = totalSkillRanks;
   if (N > 0) {
     const f = Math.floor(N / 5);
     skillCoef = b.skillCoefL1 * (1 + 0.10 * (N - f - 1) + 0.15 * f);
   }
 
-  // Buckets
-  const csdm = 1 + sum(b.slots, 'CSDM');
-  const vdm  = 1 + sum(b.slots, 'VDM');
-  const dotm = 1 + sum(b.slots, 'DOTM');
-  // Per-sheet: ADMG bundles ALLM + NONPHYS (elemental + phys + all)
-  const allm = 1 + sum(b.slots, 'ALLM') + sum(b.slots, 'NONPHYS');
+  const csdm = 1 + sumAffixes(b.slots, 'CSDM');
+  const vdm  = 1 + sumAffixes(b.slots, 'VDM');
+  const dotm = 1 + sumAffixes(b.slots, 'DOTM');
+  const allm = 1 + sumAffixes(b.slots, 'ALLM') + sumAffixes(b.slots, 'NONPHYS');
 
-  // Additive bucket (one big pool); per-line entries with uptime weighting
-  const slotAdd = sum(b.slots, 'ADDITIVE');
-  const critAdd = sum(b.slots, 'CRITADD');
-  const nakedAdd = (b.additiveLines || []).reduce((acc, l) => acc + l.value * (l.uptime ?? 1), 0);
-  const additiveTotal = 1 + nakedAdd + slotAdd;
-  const additiveCritTotal = additiveTotal + critAdd; // crit-only additive joins on crit
+  // Always-on additive: always-on naked lines + slot ADDITIVE affixes + extraAdditive list + gem%
+  const alwaysOnAdditive = b.additiveLines.filter(l => !l.conditional).reduce((a, l) => a + l.value, 0)
+    + b.extraAdditive.reduce((a, l) => a + l.value, 0)
+    + sumAffixes(b.slots, 'ADDITIVE')
+    + sumAffixes(b.slots, 'GEM');
 
-  // Weapon damage
-  const weaponDmg = b.weaponBaseDmg + sum(b.slots, 'WEPDMG');
+  const weaponDmg = computeWeaponDamage(b);
 
-  // Standalone extra multipliers (each its own factor)
   const extraMultProduct = b.extraMultipliers.reduce((p, m) => p * (1 + m.value), 1);
-
-  // Damage products (per xlsx column T/U)
-  const dpsRate = 1 + (b.attackSpeed || 0); // attack speed multiplies hits per second
-  const baseProduct = weaponDmg * mainStatMult * vdm * allm * skillCoef * extraMultProduct * b.enemyDR * dpsRate;
-  const nonCritDmg = baseProduct * additiveTotal;
-  const critDmg = baseProduct * additiveCritTotal * csdm * 1.5;
-  const avgDmg = critDmg * critChance + nonCritDmg * (1 - critChance);
-  const dotDmg = baseProduct * additiveTotal * dotm; // DoT uses non-crit additive, no crit
 
   return {
     mainStatSum, mainStatMult,
-    additiveTotal, additiveCritTotal,
+    alwaysOnAdditive,
     csdm, vdm, dotm, allm,
     critChance, totalSkillRanks, skillCoef,
     weaponDmg, extraMultProduct,
-    nonCritDmg, critDmg, avgDmg, dotDmg,
   };
 }
 
-// Compute the "% gain" from adding `delta` to a bucket
-export function gainFromAdd(b: Build, bucket: Bucket, delta: number): number {
-  const before = calc(b);
-  const baseDmg = b.disableCrit ? before.dotDmg : before.avgDmg;
-  // Inject a temporary affix and recompute
+// ---- Per-scenario damage ----
+export interface Scenario {
+  conditions: { vulnerable?: boolean; close?: boolean; distant?: boolean; elites?: boolean; cc?: boolean; healthy?: boolean; trapped?: boolean };
+  isCrit?: boolean;
+  isDot?: boolean;
+}
+
+export function scenarioAdditive(b: Build, s: Scenario): number {
+  const c = calc(b);
+  let add = c.alwaysOnAdditive;
+  for (const l of b.additiveLines) {
+    if (!l.conditional) continue;
+    if ((s.conditions as any)[l.id]) add += l.value;
+  }
+  // Crit-only additive (CRITADD bucket on slots)
+  if (s.isCrit) add += sumAffixes(b.slots, 'CRITADD');
+  return add;
+}
+
+export function scenarioVulnFactor(b: Build, s: Scenario): number {
+  // Vuln baseline 20%[x] applies if the scenario's enemy is vulnerable
+  const vulnBaseline = s.conditions.vulnerable ? 1.2 : 1;
+  return calc(b).vdm * vulnBaseline;
+}
+
+export function scenarioDamage(b: Build, s: Scenario): number {
+  const c = calc(b);
+  if (c.weaponDmg === 0) return 0;
+  const additive = 1 + scenarioAdditive(b, s);
+  const vdmFactor = scenarioVulnFactor(b, s);
+  const critFactor = s.isCrit ? c.csdm * 1.5 : 1;
+  const dotFactor = s.isDot ? c.dotm : 1;
+  return c.weaponDmg * c.mainStatMult * additive * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * b.enemyDR * critFactor * dotFactor;
+}
+
+// Marginal gain from temporarily adding `delta` to a bucket
+function gainFromAddInScenario(b: Build, bucket: Bucket, delta: number, scenario: Scenario): number {
+  const before = scenarioDamage(b, scenario);
+  if (before === 0) return 0;
   const test = structuredClone(b);
+  test.snapshot = null;
   test.slots[0].affixes.push({ bucket, value: delta });
-  const after = calc(test);
-  const newDmg = b.disableCrit ? after.dotDmg : after.avgDmg;
-  return newDmg / baseDmg - 1;
+  const after = scenarioDamage(test, scenario);
+  return after / before - 1;
 }
 
-// "Weight" = simulate a fresh GA roll on this affix (×1.75 per Avarilyn)
-// For a typical roll value of `typical` (e.g. 28% for VDM), weight = gain from adding typical*1.75
-export function weightFor(b: Build, bucket: Bucket, typical: number): number {
-  return gainFromAdd(b, bucket, typical * 1.75);
+// "Weight" = a typical fresh GA roll on this bucket
+export function weightFor(b: Build, bucket: Bucket, typical: number, scenario: Scenario): number {
+  return gainFromAddInScenario(b, bucket, typical * 1.75, scenario);
 }
 
-// Bucket display metadata
+// ---- Bucket display metadata ----
 export const BUCKET_META: Record<Bucket, { label: string; short: string; isPercent: boolean; typicalRoll: number }> = {
   CSDM:       { label: '[x] Crit Strike Damage Mult', short: 'CSDM',  isPercent: true,  typicalRoll: 0.25 },
   VDM:        { label: '[x] Vulnerable Damage Mult',   short: 'VDM',   isPercent: true,  typicalRoll: 0.14 },
   DOTM:       { label: '[x] DoT Damage Mult',          short: 'DOTM',  isPercent: true,  typicalRoll: 0.30 },
-  ALLM:       { label: '[x] All Damage Mult',          short: 'ALLM',  isPercent: true,  typicalRoll: 0.10 },
+  ALLM:       { label: '[x] All/Elemental Damage Mult',short: 'ALLM',  isPercent: true,  typicalRoll: 0.10 },
   NONPHYS:    { label: '[x] Non-Physical Mult',        short: 'NPHY',  isPercent: true,  typicalRoll: 0.24 },
   ADDITIVE:   { label: '+ Additive Damage',            short: 'ADD',   isPercent: true,  typicalRoll: 0.40 },
   CRITADD:    { label: '+ Crit Damage (additive)',     short: 'CADD',  isPercent: true,  typicalRoll: 0.40 },
   MAINSTAT:   { label: '+ Main Stat',                  short: 'STAT',  isPercent: false, typicalRoll: 180 },
-  WEPDMG:     { label: '+ Weapon Damage',              short: 'WEP',   isPercent: false, typicalRoll: 196 },
+  WEPDMG:     { label: '+ Weapon Damage Roll',         short: 'WEP',   isPercent: false, typicalRoll: 196 },
+  GEM:        { label: 'Weapon Gem (additive %)',      short: 'GEM',   isPercent: true,  typicalRoll: 0.12 },
   CRITCHANCE: { label: '+ Crit Chance',                short: 'CC',    isPercent: true,  typicalRoll: 0.085 },
   SKILLRANK:  { label: '+ Skill Ranks',                short: 'RANK',  isPercent: false, typicalRoll: 4 },
   EXTRAMULT:  { label: '[x] Standalone Multiplier',    short: 'XMULT', isPercent: true,  typicalRoll: 0.20 },
 };
 
 export const BUCKET_ORDER: Bucket[] = [
-  'CSDM','VDM','DOTM','ALLM','NONPHYS','ADDITIVE','CRITADD','MAINSTAT','WEPDMG','CRITCHANCE','SKILLRANK','EXTRAMULT'
+  'CSDM','VDM','DOTM','ALLM','NONPHYS','ADDITIVE','CRITADD','MAINSTAT','WEPDMG','GEM','CRITCHANCE','SKILLRANK','EXTRAMULT'
 ];
+
+// Output scenarios — preset list to display
+export interface NamedScenario { id: string; label: string; scenario: Scenario; }
+
+export function presetScenarios(): NamedScenario[] {
+  return [
+    { id: 'avg',         label: 'Plain hit',                scenario: { conditions: {}, isCrit: false } },
+    { id: 'crit',        label: 'Plain crit',               scenario: { conditions: {}, isCrit: true } },
+    { id: 'vuln',        label: 'vs Vulnerable',            scenario: { conditions: { vulnerable: true }, isCrit: false } },
+    { id: 'vuln_crit',   label: 'vs Vulnerable (crit)',     scenario: { conditions: { vulnerable: true }, isCrit: true } },
+    { id: 'elite',       label: 'vs Elite',                 scenario: { conditions: { elites: true }, isCrit: false } },
+    { id: 'vuln_elite_crit', label: 'vs Vuln Elite (crit)', scenario: { conditions: { vulnerable: true, elites: true }, isCrit: true } },
+    { id: 'cc',          label: 'vs CC\u2019d',              scenario: { conditions: { cc: true }, isCrit: false } },
+    { id: 'healthy',     label: 'vs Healthy',               scenario: { conditions: { healthy: true }, isCrit: false } },
+    { id: 'distant',     label: 'vs Distant',               scenario: { conditions: { distant: true }, isCrit: false } },
+    { id: 'close',       label: 'vs Close',                 scenario: { conditions: { close: true }, isCrit: false } },
+    { id: 'dot',         label: 'DoT tick',                 scenario: { conditions: {}, isCrit: false, isDot: true } },
+  ];
+}
