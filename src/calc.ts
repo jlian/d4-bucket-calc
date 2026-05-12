@@ -15,32 +15,41 @@ export const CLASSES: { id: ClassId; mainStat: string; divisor: number }[] = [
 ];
 
 // ---- Weapon types ----
+// baseDamage: average damage at 900 ipower fully masterworked (per Avarilyn xlsx).
+// speed (ApS, Attacks per Second): from Maxroll's attack speed mechanics article.
+// allowedClasses: best-effort class restrictions for current Lord of Hatred patch.
 export interface WeaponType {
   id: string;
   label: string;
   baseDamage: number;
-  speed: number;            // attacks per second baseline
+  speed: number;
   hands: 1 | 2;
+  allowedClasses?: ClassId[]; // omitted = all classes
 }
 
 export const WEAPON_TYPES: WeaponType[] = [
   { id: 'none',        label: '(none)',                     baseDamage: 0,    speed: 0,    hands: 1 },
-  { id: '1h_sword',    label: '1H Sword',                   baseDamage: 1884, speed: 1.1,  hands: 1 },
-  { id: '1h_mace',     label: '1H Mace',                    baseDamage: 1884, speed: 0.9,  hands: 1 },
-  { id: '1h_axe',      label: '1H Axe',                     baseDamage: 1884, speed: 1.0,  hands: 1 },
-  { id: '1h_dagger',   label: '1H Dagger',                  baseDamage: 1728, speed: 1.4,  hands: 1 },
-  { id: '1h_flail',    label: '1H Flail',                   baseDamage: 1728, speed: 1.0,  hands: 1 },
-  { id: '1h_wand',     label: 'Wand',                       baseDamage: 1728, speed: 1.4,  hands: 1 },
-  { id: '1h_focus',    label: 'Focus (off-hand)',           baseDamage: 0,    speed: 0,    hands: 1 },
-  { id: 'shield',      label: 'Shield (off-hand)',          baseDamage: 0,    speed: 0,    hands: 1 },
-  { id: '2h_mace',     label: '2H Mace',                    baseDamage: 4607, speed: 0.7,  hands: 2 },
-  { id: '2h_axe',      label: '2H Axe',                     baseDamage: 4607, speed: 0.8,  hands: 2 },
-  { id: '2h_sword',    label: '2H Sword',                   baseDamage: 4146, speed: 0.9,  hands: 2 },
-  { id: '2h_glaive',   label: '2H Glaive',                  baseDamage: 4146, speed: 0.9,  hands: 2 },
-  { id: '2h_polearm',  label: '2H Polearm',                 baseDamage: 4607, speed: 0.9,  hands: 2 },
-  { id: '2h_bow',      label: '2H Bow',                     baseDamage: 3768, speed: 1.0,  hands: 2 },
-  { id: '2h_xbow',     label: '2H Crossbow',                baseDamage: 4607, speed: 0.85, hands: 2 },
-  { id: '2h_qstaff',   label: '2H Quarterstaff',            baseDamage: 3768, speed: 1.0,  hands: 2 },
+  // 1H melee
+  { id: '1h_sword',    label: '1H Sword',                   baseDamage: 1884, speed: 1.1,  hands: 1, allowedClasses: ['Paladin','Barbarian','Druid','Necromancer','Rogue'] },
+  { id: '1h_mace',     label: '1H Mace',                    baseDamage: 1884, speed: 1.1,  hands: 1, allowedClasses: ['Paladin','Barbarian','Druid'] },
+  { id: '1h_axe',      label: '1H Axe',                     baseDamage: 1884, speed: 1.1,  hands: 1, allowedClasses: ['Paladin','Barbarian','Druid'] },
+  { id: '1h_dagger',   label: '1H Dagger',                  baseDamage: 1728, speed: 1.2,  hands: 1, allowedClasses: ['Rogue','Sorcerer','Warlock'] },
+  { id: '1h_flail',    label: '1H Flail',                   baseDamage: 1728, speed: 1.0,  hands: 1, allowedClasses: ['Rogue'] },
+  { id: '1h_wand',     label: 'Wand',                       baseDamage: 1728, speed: 1.2,  hands: 1, allowedClasses: ['Sorcerer','Necromancer','Warlock'] },
+  // Off-hands
+  { id: 'shield',      label: 'Shield (off-hand)',          baseDamage: 0,    speed: 0,    hands: 1, allowedClasses: ['Paladin','Barbarian','Necromancer'] },
+  { id: 'focus',       label: 'Focus (off-hand)',           baseDamage: 0,    speed: 0,    hands: 1, allowedClasses: ['Sorcerer','Necromancer','Druid','Warlock','Paladin'] },
+  // 2H melee
+  { id: '2h_mace',     label: '2H Mace',                    baseDamage: 4607, speed: 0.9,  hands: 2, allowedClasses: ['Barbarian','Druid','Paladin'] },
+  { id: '2h_axe',      label: '2H Axe',                     baseDamage: 4607, speed: 0.9,  hands: 2, allowedClasses: ['Barbarian','Druid'] },
+  { id: '2h_sword',    label: '2H Sword',                   baseDamage: 4146, speed: 1.0,  hands: 2, allowedClasses: ['Barbarian','Necromancer','Paladin'] },
+  { id: '2h_scythe',   label: '2H Scythe',                  baseDamage: 4607, speed: 0.9,  hands: 2, allowedClasses: ['Necromancer','Druid'] },
+  { id: '2h_polearm',  label: '2H Polearm',                 baseDamage: 4607, speed: 0.9,  hands: 2, allowedClasses: ['Paladin','Spiritborn'] },
+  { id: '2h_glaive',   label: '2H Glaive',                  baseDamage: 4146, speed: 1.0,  hands: 2, allowedClasses: ['Spiritborn'] },
+  { id: '2h_qstaff',   label: '2H Quarterstaff',            baseDamage: 3768, speed: 1.0,  hands: 2, allowedClasses: ['Spiritborn','Sorcerer','Druid','Warlock'] },
+  // 2H ranged
+  { id: '2h_bow',      label: '2H Bow',                     baseDamage: 3768, speed: 1.0,  hands: 2, allowedClasses: ['Rogue'] },
+  { id: '2h_xbow',     label: '2H Crossbow',                baseDamage: 4607, speed: 0.85, hands: 2, allowedClasses: ['Rogue'] },
 ];
 
 export function weaponTypeById(id: string): WeaponType {

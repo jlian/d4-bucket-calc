@@ -218,7 +218,9 @@ function slotBlock(slot: Slot) {
   if (isWeapon) {
     const sel = el('select', { class: inputCls() + ' text-xs' }) as HTMLSelectElement;
     for (const wt of WEAPON_TYPES) {
-      const opt = el('option', { value: wt.id }, wt.label + (wt.baseDamage ? ` (${wt.baseDamage} @ ${wt.speed.toFixed(2)}/s)` : ''));
+      // Filter to weapons usable by this class (or always show 'none')
+      if (wt.allowedClasses && !wt.allowedClasses.includes(build.classId)) continue;
+      const opt = el('option', { value: wt.id }, wt.label + (wt.baseDamage ? ` — ${wt.baseDamage}×${wt.speed.toFixed(2)}/s` : ''));
       if (wt.id === (slot.weaponTypeId ?? 'none')) opt.setAttribute('selected', '');
       sel.append(opt);
     }
@@ -361,35 +363,33 @@ function scenariosCard() {
 
 // ---------- OUTPUT: DPS ----------
 function dpsCard() {
-  const card = sectionCard('DPS (Attack Speed)',
-    'Equip your gear, then read your "Attack Speed Bonus" from the Offensive tab. Multiplies hits/sec.');
+  const card = sectionCard('Attacks per Second (informational)',
+    'Approximate sustained ApS = base weapon ApS × (1 + AS%). Real DPS depends on per-skill animation breakpoints — most skills only gain DPS at specific AS thresholds.');
 
   const c = calc(build);
   const wsRow = el('div', { class: 'mb-2 flex items-center gap-2' });
-  wsRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Weapon Speed (auto)'));
+  wsRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Weapon ApS (auto)'));
   const ws = el('span', { class: 'text-xs text-zinc-300 font-mono' }, c.weaponSpeed > 0 ? c.weaponSpeed.toFixed(2) + ' /s' : '— pick weapon');
   wsRow.append(ws);
   card.append(wsRow);
 
   const asRow = el('div', { class: 'mb-2 flex items-center gap-2' });
-  asRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Attack Speed Bonus'));
+  asRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Attack Speed Bonus (Offensive tab)'));
   asRow.append(pctInput(() => build.attackSpeedBonus, v => build.attackSpeedBonus = v, { w: 'w-24', step: 1 }));
   asRow.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
   card.append(asRow);
 
   if (c.weaponDmg > 0 && c.effectiveAttackRate > 0) {
-    const refScenario = build.disableCrit
-      ? presetScenarios().find(s => s.id === 'dot')!
-      : presetScenarios().find(s => s.id === 'plain')!;
-    const dmg = scenarioDamage(build, refScenario);
-    const dps = dmg * c.effectiveAttackRate;
     card.append(el('div', { class: 'mt-3 flex items-baseline justify-between' },
-      el('span', { class: 'text-zinc-400 text-sm' }, `DPS (${refScenario.label})`),
-      el('span', { class: 'text-xl font-bold text-amber-400' }, fmtBigNum(dps)),
+      el('span', { class: 'text-zinc-400 text-sm' }, 'Effective ApS'),
+      el('span', { class: 'text-xl font-bold text-amber-400' }, c.effectiveAttackRate.toFixed(2) + ' /s'),
     ));
-    card.append(el('div', { class: 'text-xs text-zinc-500 mt-1' }, `Effective rate: ${c.effectiveAttackRate.toFixed(2)} hits/s`));
   }
-  card.append(el('p', { class: 'text-xs text-zinc-600 mt-2 italic' }, 'Note: many skills have AS breakpoints — only use this for skills that scale linearly (e.g., basic attacks, Dance of Knives).'));
+  card.append(el('p', { class: 'text-xs text-zinc-600 mt-3 italic' },
+    'Skills round to game frames. AS% only helps when it crosses a breakpoint. See Maxroll’s ',
+    Object.assign(el('a', { href: 'https://maxroll.gg/d4/resources/attack-speed-mechanics', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Attack Speed Mechanics' }),
+    ' guide for per-skill breakpoint tables. AS% caps at 200% (2 × 100% caps).',
+  ));
   return card;
 }
 
