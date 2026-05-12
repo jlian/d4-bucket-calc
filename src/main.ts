@@ -526,7 +526,7 @@ function bucketsCard() {
       ),
       el('p', {},
         'Now if your VDM bucket only has +20% (×1.20) and you add the same +25% affix, the bucket goes to ×1.45. ',
-        'Damage gain = ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '1.45 / 1.20 = +21%'), — ',
+        'Damage gain = ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '1.45 / 1.20 = +21%'), ', ',
         el('strong', {}, 'twice as good '), 'because the bucket was smaller.',
       ),
       el('p', {},
