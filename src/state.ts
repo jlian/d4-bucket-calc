@@ -1,18 +1,18 @@
 import pako from 'pako';
-import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, cloneDefaultLines, type Build, type AdditiveLine } from './calc';
+import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, cloneDefaultLines, BUCKET_META, CLASSES, type Build, type AdditiveLine } from './calc';
 
 const STORAGE_KEY = 'd4bc.build';
 
 // AdditiveLine has a function field that doesn't survive JSON. Serialize as {id,value} pairs.
 function lineToSerial(l: AdditiveLine) { return { id: l.id, value: l.value }; }
 function rehydrateLines(serial: { id: string; value: number }[] | undefined): AdditiveLine[] {
-  const map = Object.fromEntries(DEFAULT_ADDITIVE_LINES.map(d => [d.id, d]));
   const out = cloneDefaultLines();
-  if (serial) {
+  if (Array.isArray(serial)) {
+    const known = new Set(DEFAULT_ADDITIVE_LINES.map(d => d.id));
     for (const s of serial) {
+      if (!s || typeof s.id !== 'string' || !known.has(s.id)) continue;
       const target = out.find(l => l.id === s.id);
-      if (target) target.value = s.value;
-      else if (map[s.id]) out.push({ ...map[s.id], value: s.value });
+      if (target) target.value = validNumber(s.value, 0);
     }
   }
   return out;
@@ -28,7 +28,11 @@ function migrateSlots(slotsIn: any): import('./calc').Slot[] {
   return defaults.map(def => {
     const found = incoming.find(s => s && s.id === def.id);
     if (!found) return { ...def, affixes: [] };
-    const affixes = Array.isArray(found.affixes) ? found.affixes.filter((a: any) => a && typeof a.bucket === 'string' && typeof a.value === 'number') : [];
+    const affixes = Array.isArray(found.affixes)
+      ? found.affixes
+          .filter((a: any) => a && typeof a.bucket === 'string' && a.bucket in BUCKET_META)
+          .map((a: any) => ({ bucket: a.bucket, value: validNumber(a.value, 0), ...(typeof a.label === 'string' ? { label: a.label } : {}) }))
+      : [];
     const isWeapon = def.id === 'wep1' || def.id === 'wep2';
     const weaponTypeId = isWeapon ? (typeof found.weaponTypeId === 'string' ? found.weaponTypeId : 'none') : undefined;
     return { id: def.id, name: def.name, affixes, ...(isWeapon ? { weaponTypeId } : {}) };
@@ -47,9 +51,10 @@ function validStringList(arr: any, fields: string[]): any[] {
 
 function serialToBuild(j: any): Build {
   if (!j || typeof j !== 'object') throw new Error('not an object');
+  const knownClass = typeof j.classId === 'string' && CLASSES.some(c => c.id === j.classId);
   const out: Build = {
     ...DEFAULT_BUILD,
-    classId: typeof j.classId === 'string' ? j.classId : DEFAULT_BUILD.classId,
+    classId: knownClass ? j.classId : DEFAULT_BUILD.classId,
     baseMainStat: validNumber(j.baseMainStat, DEFAULT_BUILD.baseMainStat),
     extraMainStat: validNumber(j.extraMainStat, 0),
     skillName: typeof j.skillName === 'string' ? j.skillName : DEFAULT_BUILD.skillName,
