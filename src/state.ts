@@ -1,5 +1,5 @@
 import pako from 'pako';
-import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, type Build, type AdditiveLine } from './calc';
+import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, cloneDefaultLines, type Build, type AdditiveLine } from './calc';
 
 const STORAGE_KEY = 'd4bc.build';
 
@@ -7,8 +7,7 @@ const STORAGE_KEY = 'd4bc.build';
 function lineToSerial(l: AdditiveLine) { return { id: l.id, value: l.value }; }
 function rehydrateLines(serial: { id: string; value: number }[] | undefined): AdditiveLine[] {
   const map = Object.fromEntries(DEFAULT_ADDITIVE_LINES.map(d => [d.id, d]));
-  // start from default lines, apply user values
-  const out = DEFAULT_ADDITIVE_LINES.map(d => ({ ...d }));
+  const out = cloneDefaultLines();
   if (serial) {
     for (const s of serial) {
       const target = out.find(l => l.id === s.id);
@@ -80,7 +79,13 @@ export function loadInitialBuild(): Build {
     const b = decodeHash(hash);
     if (b) return b;
   }
-  return loadLocal() ?? structuredClone(DEFAULT_BUILD);
+  return loadLocal() ?? defaultBuild();
+}
+
+export function defaultBuild(): Build { return { ...DEFAULT_BUILD, additiveLines: cloneDefaultLines(), slots: structuredClone(DEFAULT_BUILD.slots), extraMultipliers: [], extraAdditive: [], snapshot: null }; }
+
+export function cloneBuild(b: Build): Build {
+  return { ...b, additiveLines: b.additiveLines.map(l => ({ ...l })), slots: structuredClone(b.slots), extraMultipliers: structuredClone(b.extraMultipliers), extraAdditive: structuredClone(b.extraAdditive), snapshot: b.snapshot ? cloneBuild(b.snapshot) : null };
 }
 
 export function persist(b: Build) {

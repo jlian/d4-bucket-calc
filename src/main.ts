@@ -5,7 +5,7 @@ import {
   WEAPON_TYPES,
   type Build, type Bucket, type Slot,
 } from './calc';
-import { loadInitialBuild, persist, exportJson, importJson } from './state';
+import { loadInitialBuild, persist, exportJson, importJson, cloneBuild } from './state';
 
 let build: Build = loadInitialBuild();
 
@@ -539,7 +539,7 @@ function snapshotBtn() {
   }
   const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Freeze current build to compare against future changes' }, '📌 Snapshot');
   btn.addEventListener('click', () => {
-    const snap = structuredClone(build); snap.snapshot = null;
+    const snap = cloneBuild(build); snap.snapshot = null;
     build.snapshot = snap;
     mount();
   });

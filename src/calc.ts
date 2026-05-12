@@ -107,7 +107,7 @@ const ifCC = (s: ScenarioConditions) => !!s.cc;
 const ifHealthy = (s: ScenarioConditions) => !!s.healthy;
 const ifPoisoned = (s: ScenarioConditions) => !!s.poisoned;
 
-// Note: in-game order
+// Note: in-game order. (No imbuement: it's a Rogue-only line and users can add it via Extra Additive.)
 export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
   { id: 'crit',         label: 'Critical Strike Damage', value: 0, applies: ifCrit, isCritOnly: true },
   { id: 'vulnerable',   label: 'Vulnerable Damage',      value: 0, applies: ifVuln },
@@ -119,7 +119,6 @@ export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
   { id: 'poison',       label: 'Damage with Poison',     value: 0, applies: alwaysOn },
   { id: 'shadow',       label: 'Damage with Shadow',     value: 0, applies: alwaysOn },
   { id: 'ultimate',     label: 'Damage with Ultimate',   value: 0, applies: alwaysOn },
-  { id: 'imbuement',    label: 'Damage with Imbuement',  value: 0, applies: alwaysOn },
   { id: 'close',        label: 'Damage vs Close',        value: 0, applies: ifClose },
   { id: 'distant',      label: 'Damage vs Distant',      value: 0, applies: ifDistant },
   { id: 'elites',       label: 'Damage vs Elites',       value: 0, applies: ifElites },
@@ -127,6 +126,9 @@ export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
   { id: 'healthy',      label: 'Damage vs Healthy',      value: 0, applies: ifHealthy },
   { id: 'poisoned',     label: 'Damage vs Poisoned',     value: 0, applies: ifPoisoned },
 ];
+
+// Helper that clones default lines without losing function fields (structuredClone can't clone functions)
+export function cloneDefaultLines(): AdditiveLine[] { return DEFAULT_ADDITIVE_LINES.map(l => ({ ...l })); }
 
 // ---- Build ----
 export interface Build {
@@ -153,7 +155,7 @@ export const DEFAULT_BUILD: Build = {
   classId: 'Paladin',
   baseMainStat: 800,
   extraMainStat: 0,
-  additiveLines: structuredClone(DEFAULT_ADDITIVE_LINES),
+  additiveLines: cloneDefaultLines(),
   extraAdditive: [],
   skillName: 'Main Skill',
   skillCoefL1: 0.45,
@@ -302,8 +304,8 @@ export function scenarioDamageNoCrit(b: Build, scenario: Scenario): number {
 function gainFromAddInScenario(b: Build, bucket: Bucket, delta: number, scenario: Scenario): number {
   const before = scenarioDamage(b, scenario);
   if (before === 0) return 0;
-  const test = structuredClone(b); test.snapshot = null;
-  test.slots[0].affixes.push({ bucket, value: delta });
+  // Cheap clone: only need slots[0].affixes mutable, share the rest
+  const test: Build = { ...b, snapshot: null, slots: b.slots.map((s, i) => i === 0 ? { ...s, affixes: [...s.affixes, { bucket, value: delta }] } : s) };
   return scenarioDamage(test, scenario) / before - 1;
 }
 
