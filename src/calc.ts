@@ -25,21 +25,16 @@ export interface AdditiveLine {
 export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
   { id: 'vulnerable',   label: 'Vulnerable Damage',     value: 0, uptime: 1 },
   { id: 'all',          label: 'All Damage',            value: 0, uptime: 1 },
-  { id: 'physical',     label: 'Physical Damage',       value: 0, uptime: 1 },
-  { id: 'cold',         label: 'Cold Damage',           value: 0, uptime: 1 },
-  { id: 'fire',         label: 'Fire Damage',           value: 0, uptime: 1 },
-  { id: 'lightning',    label: 'Lightning Damage',      value: 0, uptime: 1 },
-  { id: 'poison',       label: 'Poison Damage',         value: 0, uptime: 1 },
-  { id: 'shadow',       label: 'Shadow Damage',         value: 0, uptime: 1 },
-  { id: 'holy',         label: 'Holy Damage',           value: 0, uptime: 1 },
+  { id: 'primaryElem',  label: 'Primary Element',       value: 0, uptime: 1 },
   { id: 'dot',          label: 'Damage over Time',      value: 0, uptime: 1 },
-  { id: 'close',        label: 'Damage to Close',       value: 0, uptime: 0.5 },
-  { id: 'distant',      label: 'Damage to Distant',     value: 0, uptime: 0.5 },
-  { id: 'elites',       label: 'Damage to Elites',      value: 0, uptime: 0.4 },
-  { id: 'cc',           label: 'Damage to CC’d',         value: 0, uptime: 0.7 },
-  { id: 'healthy',      label: 'Damage to Healthy',     value: 0, uptime: 0.5 },
-  { id: 'trapped',      label: 'Damage to Trapped',     value: 0, uptime: 0.5 },
+  { id: 'close',        label: 'Damage to Close',       value: 0, uptime: 1 },
+  { id: 'distant',      label: 'Damage to Distant',     value: 0, uptime: 1 },
+  { id: 'elites',       label: 'Damage to Elites',      value: 0, uptime: 1 },
+  { id: 'cc',           label: 'Damage to CC’d',         value: 0, uptime: 1 },
+  { id: 'healthy',      label: 'Damage to Healthy',     value: 0, uptime: 1 },
+  { id: 'trapped',      label: 'Damage to Trapped',     value: 0, uptime: 1 },
   { id: 'imbued',       label: 'Imbued Damage',         value: 0, uptime: 1 },
+  { id: 'overpower',    label: 'Overpower Damage',      value: 0, uptime: 1 },
 ];
 
 // Bucket identifiers
@@ -93,6 +88,7 @@ export interface Build {
   skillRanks: number;         // e.g. 15
   extraSkillRanks: number;    // from items/effects
   baseCritChance: number;     // decimal (paragon + base, no items)
+  attackSpeed: number;        // decimal, multiplier on DPS rate; 0 = ignored
   disableCrit: boolean;       // true = DoT build, ignore crit
   enemyDR: number;            // 0.20 = training dummy default (after 80% reduction)
   weaponBaseDmg: number;      // average weapon damage (the big number)
@@ -112,6 +108,7 @@ export const DEFAULT_BUILD: Build = {
   skillRanks: 5,
   extraSkillRanks: 0,
   baseCritChance: 0.05,
+  attackSpeed: 0,
   disableCrit: false,
   enemyDR: 0.2,
   weaponBaseDmg: 3000,
@@ -199,7 +196,8 @@ export function calc(b: Build): Calc {
   const extraMultProduct = b.extraMultipliers.reduce((p, m) => p * (1 + m.value), 1);
 
   // Damage products (per xlsx column T/U)
-  const baseProduct = weaponDmg * mainStatMult * vdm * allm * skillCoef * extraMultProduct * b.enemyDR;
+  const dpsRate = 1 + (b.attackSpeed || 0); // attack speed multiplies hits per second
+  const baseProduct = weaponDmg * mainStatMult * vdm * allm * skillCoef * extraMultProduct * b.enemyDR * dpsRate;
   const nonCritDmg = baseProduct * additiveTotal;
   const critDmg = baseProduct * additiveCritTotal * csdm * 1.5;
   const avgDmg = critDmg * critChance + nonCritDmg * (1 - critChance);
