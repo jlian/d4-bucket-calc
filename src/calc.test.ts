@@ -20,7 +20,7 @@ function close(a: number, b: number, pct = 0.5): boolean {
 }
 
 function makeReferencePaladin(): Build {
-  // Replicate Avarilyn's example: stuff every 1H + 2H affix onto the 2H wep1 slot
+  // Replicate Avarilyn's example: stuff every 1H + 2H affix onto a class-valid 2H wep1 slot
   // since our app doesn't allow simultaneous 1H + 2H equip.
   const b: Build = {
     ...DEFAULT_BUILD,
@@ -57,7 +57,7 @@ function makeReferencePaladin(): Build {
       { id: 'ring2', name: 'Ring 2', affixes: [
         { bucket: 'CSDM', value: 0.31 }, { bucket: 'VDM', value: 0.18 }, { bucket: 'CRITCHANCE', value: 0.063 },
       ]},
-      { id: 'wep1', name: 'Weapon 1', weaponTypeId: '2h_xbow', affixes: [
+      { id: 'wep1', name: 'Weapon 1', weaponTypeId: '2h_polearm', affixes: [
         // Combined 1H+1H+2H affixes from the spreadsheet's filled example
         { bucket: 'CSDM', value: 0.5 + 0.5 + 1.0 },          // 1H wep1 + 1H wep2 + 2H
         { bucket: 'ALLM', value: 0.25 },                       // 2H ALLM

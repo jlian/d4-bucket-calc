@@ -2,6 +2,7 @@ import pako from 'pako';
 import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, cloneDefaultLines, BUCKET_META, CLASSES, WEAPON_TYPES, type Build, type AdditiveLine } from './calc';
 
 const STORAGE_KEY = 'd4bc.build';
+const LEGACY_WEAPON_IDS: Record<string, string> = { '1h_focus': 'focus' };
 
 // AdditiveLine has a function field that doesn't survive JSON. Serialize as {id,value} pairs.
 function lineToSerial(l: AdditiveLine) { return { id: l.id, value: l.value }; }
@@ -25,6 +26,7 @@ function buildToSerial(b: Build): any {
 function migrateSlots(slotsIn: any): import('./calc').Slot[] {
   const defaults = DEFAULT_BUILD.slots;
   const incoming = Array.isArray(slotsIn) ? slotsIn : [];
+  const knownWeaponIds = new Set(WEAPON_TYPES.map(w => w.id));
   return defaults.map(def => {
     const found = incoming.find(s => s && s.id === def.id);
     if (!found) return { ...def, affixes: [] };
@@ -34,7 +36,13 @@ function migrateSlots(slotsIn: any): import('./calc').Slot[] {
           .map((a: any) => ({ bucket: a.bucket, value: validNumber(a.value, 0), ...(typeof a.label === 'string' ? { label: a.label } : {}) }))
       : [];
     const isWeapon = def.id === 'wep1' || def.id === 'wep2';
-    const weaponTypeId = isWeapon ? (typeof found.weaponTypeId === 'string' ? found.weaponTypeId : 'none') : undefined;
+    const weaponTypeId = isWeapon
+      ? (() => {
+          const rawId = typeof found.weaponTypeId === 'string' ? found.weaponTypeId : 'none';
+          const normalized = LEGACY_WEAPON_IDS[rawId] ?? rawId;
+          return knownWeaponIds.has(normalized) ? normalized : 'none';
+        })()
+      : undefined;
     return { id: def.id, name: def.name, affixes, ...(isWeapon ? { weaponTypeId } : {}) };
   });
 }
