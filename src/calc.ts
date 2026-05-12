@@ -276,8 +276,8 @@ export function scenarioDamage(b: Build, scenario: Scenario): number {
   const baseAdd = additiveForScenario(b, scenario.conditions);
   const critAddExtra = critOnlyAdditive(b);
 
-  // Vuln baseline 20% multiplier applies if scenario is vulnerable
-  const vdmFactor = c.vdm * (scenario.conditions.vulnerable ? 1.2 : 1);
+  // Vuln baseline 20% AND VDM bucket only apply when target is vulnerable
+  const vdmFactor = scenario.conditions.vulnerable ? c.vdm * 1.2 : 1;
 
   const baseFactors = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * b.enemyDR;
 

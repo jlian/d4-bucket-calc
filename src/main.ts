@@ -160,7 +160,8 @@ function classSkillCard() {
 
   grid.append(field('Skill name', textInput(() => build.skillName, v => build.skillName = v, { w: 'w-full', placeholder: 'e.g. Holy Bolt' })));
   grid.append(field('Skill Coef % (rank 1, e.g. 45)', pctInput(() => build.skillCoefL1, v => build.skillCoefL1 = v, { step: 0.5, w: 'w-full' })));
-  grid.append(field('Total Skill Ranks', numInput(() => build.skillRanks, v => build.skillRanks = v, { w: 'w-full' })));
+  grid.append(field('Base Skill Ranks (1-baseline + bonuses)', numInput(() => build.skillRanks, v => build.skillRanks = v, { w: 'w-full' })));
+  grid.append(field('Extra Skill Ranks (charms / non-gear)', numInput(() => build.extraSkillRanks, v => build.extraSkillRanks = v, { w: 'w-full' })));
   grid.append(field(`Base ${cls.mainStat} (no gear)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
   grid.append(field(`Extra ${cls.mainStat} (charms)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
 
