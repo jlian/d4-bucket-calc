@@ -232,7 +232,8 @@ export function calc(b: Build): Calc {
   const csdm = 1 + sumAffixes(b.slots, 'CSDM');
   const vdm  = 1 + sumAffixes(b.slots, 'VDM');
   const dotm = 1 + sumAffixes(b.slots, 'DOTM');
-  const allm = 1 + sumAffixes(b.slots, 'ALLM') + sumAffixes(b.slots, 'NONPHYS');
+  // Per Avarilyn's sheet: weapon gems sum INTO the ALLM bucket, not ADDITIVE.
+  const allm = 1 + sumAffixes(b.slots, 'ALLM') + sumAffixes(b.slots, 'NONPHYS') + sumAffixes(b.slots, 'GEM');
 
   const wd = computeWeaponDamage(b);
   const weaponSpeed = b.weaponSpeedOverride ?? wd.speed;
@@ -261,7 +262,6 @@ function additiveForScenario(b: Build, conditions: ScenarioConditions): number {
   }
   add += b.extraAdditive.reduce((a, l) => a + l.value, 0);
   add += sumAffixes(b.slots, 'ADDITIVE');
-  add += sumAffixes(b.slots, 'GEM');
   return add;
 }
 
@@ -321,7 +321,7 @@ export const BUCKET_META: Record<Bucket, { label: string; isPercent: boolean; ty
   CRITADD:    { label: '+ Crit Damage (additive)',     isPercent: true,  typicalRoll: 0.40 },
   MAINSTAT:   { label: '+ Main Stat',                  isPercent: false, typicalRoll: 180 },
   WEPDMG:     { label: '+ Weapon Damage Roll',         isPercent: false, typicalRoll: 196 },
-  GEM:        { label: 'Weapon Gem (additive %)',      isPercent: true,  typicalRoll: 0.12 },
+  GEM:        { label: 'Weapon Gem (sums into ALLM)', isPercent: true,  typicalRoll: 0.12 },
   CRITCHANCE: { label: '+ Crit Chance',                isPercent: true,  typicalRoll: 0.085 },
   SKILLRANK:  { label: '+ Skill Ranks',                isPercent: false, typicalRoll: 4 },
   EXTRAMULT:  { label: '[x] Standalone Multiplier',    isPercent: true,  typicalRoll: 0.20 },
