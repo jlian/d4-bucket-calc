@@ -245,7 +245,7 @@ export function calc(b: Build): Calc {
   const allm = 1 + sumAffixes(b.slots, 'ALLM') + sumAffixes(b.slots, 'NONPHYS') + sumAffixes(b.slots, 'GEM');
 
   const wd = computeWeaponDamage(b);
-  const weaponSpeed = b.weaponSpeedOverride ?? wd.speed;
+  const weaponSpeed = (b.weaponSpeedOverride && b.weaponSpeedOverride > 0) ? b.weaponSpeedOverride : wd.speed;
   const effectiveAttackRate = weaponSpeed * (1 + (b.attackSpeedBonus || 0));
 
   const extraMultProduct = b.extraMultipliers.reduce((p, m) => p * (1 + m.value), 1);

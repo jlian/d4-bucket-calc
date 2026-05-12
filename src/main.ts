@@ -155,7 +155,19 @@ function classSkillCard() {
     if (c.id === build.classId) opt.setAttribute('selected', '');
     classSel.append(opt);
   }
-  classSel.addEventListener('change', () => { build.classId = classSel.value as any; persist(build); mount(); });
+  classSel.addEventListener('change', () => {
+    build.classId = classSel.value as any;
+    // Reconcile any equipped weapons whose allowedClasses no longer include this class
+    for (const slot of build.slots) {
+      if (!slot.weaponTypeId || slot.weaponTypeId === 'none') continue;
+      const wt = WEAPON_TYPES.find(w => w.id === slot.weaponTypeId);
+      if (wt?.allowedClasses && !wt.allowedClasses.includes(build.classId)) {
+        slot.weaponTypeId = 'none';
+      }
+    }
+    persist(build);
+    mount();
+  });
   grid.append(field('Class', classSel));
 
   grid.append(field('Skill name', textInput(() => build.skillName, v => build.skillName = v, { w: 'w-full', placeholder: 'e.g. Holy Bolt' })));
