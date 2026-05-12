@@ -1,5 +1,5 @@
 import pako from 'pako';
-import { DEFAULT_BUILD, type Build } from './calc';
+import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, type Build } from './calc';
 
 const STORAGE_KEY = 'd4bc.build';
 
@@ -36,7 +36,31 @@ export function decodeHash(hash: string): Build | null {
 }
 
 function mergeWithDefault(b: any): Build {
-  return { ...DEFAULT_BUILD, ...b, slots: b.slots ?? DEFAULT_BUILD.slots, extraMultipliers: b.extraMultipliers ?? [] };
+  // Migrate older `additivePool` (single number) to per-line list
+  let additiveLines = b.additiveLines;
+  if (!additiveLines && typeof b.additivePool === 'number') {
+    additiveLines = structuredClone(DEFAULT_ADDITIVE_LINES);
+    additiveLines[0].value = b.additivePool; // dump into Vulnerable line as a placeholder
+  }
+  if (!additiveLines) additiveLines = structuredClone(DEFAULT_ADDITIVE_LINES);
+  return {
+    ...DEFAULT_BUILD,
+    ...b,
+    slots: b.slots ?? DEFAULT_BUILD.slots,
+    extraMultipliers: b.extraMultipliers ?? [],
+    additiveLines,
+    snapshot: b.snapshot ?? null,
+  };
+}
+
+export function exportJson(b: Build): string {
+  return JSON.stringify(b, null, 2);
+}
+
+export function importJson(text: string): Build | null {
+  try {
+    return mergeWithDefault(JSON.parse(text));
+  } catch { return null; }
 }
 
 export function loadInitialBuild(): Build {

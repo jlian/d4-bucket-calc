@@ -1,6 +1,6 @@
 import './style.css';
 import { calc, classFor, CLASSES, BUCKET_META, BUCKET_ORDER, weightFor, type Build, type Bucket, type Affix } from './calc';
-import { loadInitialBuild, persist } from './state';
+import { loadInitialBuild, persist, exportJson, importJson } from './state';
 
 let build: Build = loadInitialBuild();
 
@@ -41,7 +41,10 @@ function render() {
         el('h1', { class: 'text-lg font-bold' }, 'D4 Bucket Calc'),
         el('span', { class: 'text-xs text-zinc-500 hidden sm:inline' }, 'Season 13 · Lord of Hatred'),
       ),
-      el('div', { class: 'flex items-center gap-2' },
+      el('div', { class: 'flex items-center gap-2 flex-wrap' },
+        snapshotBtn(),
+        importBtn(),
+        exportBtn(),
         copyShareBtn(),
         resetBtn(),
       ),
@@ -105,9 +108,41 @@ function characterCard(cls: { mainStat: string; divisor: number }) {
 }
 
 function additivePoolCard() {
-  const card = sectionCard('Additive Pool (Naked Baseline)');
-  card.append(el('p', { class: 'text-xs text-zinc-400 mb-2' }, 'Sum of all "+%" damage lines from paragon/glyphs (no gear). Hover each in-game stat and use the BOTTOM number. Apply uptime weighting yourself (e.g., CC × 0.7).'));
-  card.append(numField('Naked Additive Sum (decimal, e.g. 7.95 for 795%)', build.additivePool, v => { build.additivePool = v; render(); }, 0.01, true));
+  const card = sectionCard('Additive Damage (Naked Baseline)');
+  card.append(el('p', { class: 'text-xs text-zinc-400 mb-3' }, 'Per-line entries from your character sheet (gear off). Hover each in-game stat and use the BOTTOM number. Uptime weights what fraction of the time the bonus actually applies (e.g., CC = 70%).'));
+
+  const grid = el('div', { class: 'grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5' });
+
+  for (const line of build.additiveLines) {
+    const row = el('div', { class: 'flex items-center gap-2' });
+    row.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, line.label));
+    row.append(Object.assign(el('input', {
+      type: 'number', step: '0.01',
+      class: inputCls() + ' w-20 text-right',
+      placeholder: '0',
+    }) as HTMLInputElement, {
+      value: line.value || 0,
+      oninput: (e: Event) => { line.value = parseFloat((e.target as HTMLInputElement).value) || 0; render(); },
+    }));
+    row.append(el('span', { class: 'text-zinc-600 text-xs' }, '×'));
+    row.append(Object.assign(el('input', {
+      type: 'number', step: '0.05', min: '0', max: '1',
+      class: inputCls() + ' w-16 text-right',
+      title: 'Uptime (0..1)',
+    }) as HTMLInputElement, {
+      value: line.uptime ?? 1,
+      oninput: (e: Event) => { line.uptime = parseFloat((e.target as HTMLInputElement).value) || 0; render(); },
+    }));
+    grid.append(row);
+  }
+  card.append(grid);
+
+  // Show effective sum
+  const effSum = build.additiveLines.reduce((acc, l) => acc + l.value * (l.uptime ?? 1), 0);
+  card.append(el('div', { class: 'mt-3 pt-2 border-t border-zinc-800 flex justify-between text-xs' },
+    el('span', { class: 'text-zinc-500' }, 'Effective additive sum (uptime-weighted):'),
+    el('span', { class: 'text-amber-400 font-mono' }, fmtPct(effSum, 1)),
+  ));
   return card;
 }
 
@@ -200,6 +235,23 @@ function damageCard(c: ReturnType<typeof calc>) {
     el('div', {}, `Crit:     ${fmtBigNum(c.critDmg)}`),
     el('div', {}, `DoT tick: ${fmtBigNum(c.dotDmg)}`),
   ));
+
+  // Snapshot delta
+  if (build.snapshot) {
+    const snapNoSnap = { ...build.snapshot, snapshot: null } as Build;
+    const sc = calc(snapNoSnap);
+    const snapDmg = build.disableCrit ? sc.dotDmg : sc.avgDmg;
+    const delta = dmg / snapDmg - 1;
+    const sign = delta >= 0 ? '+' : '';
+    const cls = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-zinc-500';
+    card.append(el('div', { class: 'mt-3 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs' },
+      el('span', { class: 'text-zinc-500' }, '📌 vs snapshot:'),
+      el('span', { class: cls + ' font-bold tabular-nums' }, sign + fmtPct(delta, 2)),
+    ));
+    card.append(el('div', { class: 'text-xs text-zinc-600' },
+      `Snapshot ${build.disableCrit ? 'DoT' : 'avg'}: ${fmtBigNum(snapDmg)}`,
+    ));
+  }
   return card;
 }
 
@@ -297,6 +349,59 @@ function copyShareBtn() {
       setTimeout(() => { btn.textContent = old; }, 1500);
     },
   }, 'Copy Share Link');
+}
+
+function snapshotBtn() {
+  if (build.snapshot) {
+    return el('button', {
+      class: 'text-xs px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-100',
+      title: 'Clear comparison snapshot',
+      onclick: () => { build.snapshot = null; render(); },
+    }, '📌 Clear Snapshot');
+  }
+  return el('button', {
+    class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300',
+    title: 'Freeze current build to compare against future changes',
+    onclick: () => {
+      const snap = structuredClone(build);
+      snap.snapshot = null;
+      build.snapshot = snap;
+      render();
+    },
+  }, '📌 Snapshot');
+}
+
+function exportBtn() {
+  return el('button', {
+    class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300',
+    onclick: async () => {
+      const json = exportJson(build);
+      try {
+        await navigator.clipboard.writeText(json);
+        const btn = document.activeElement as HTMLButtonElement;
+        const old = btn.textContent;
+        btn.textContent = 'JSON Copied!';
+        setTimeout(() => { btn.textContent = old; }, 1500);
+      } catch {
+        // fallback: open prompt
+        prompt('Copy this JSON:', json);
+      }
+    },
+  }, 'Export JSON');
+}
+
+function importBtn() {
+  return el('button', {
+    class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300',
+    onclick: () => {
+      const text = prompt('Paste build JSON:');
+      if (!text) return;
+      const parsed = importJson(text);
+      if (!parsed) { alert('Invalid JSON'); return; }
+      build = parsed;
+      render();
+    },
+  }, 'Import JSON');
 }
 
 function resetBtn() {

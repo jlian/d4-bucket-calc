@@ -1,7 +1,7 @@
 // Damage formula port from Avarilyn's "ALL CLASSES" sheet (D4 Season 13 Lord of Hatred).
 // All percentages stored as decimals (50% = 0.5).
 
-export type ClassId = 'Paladin' | 'Barbarian' | 'Druid' | 'Necromancer' | 'Rogue' | 'Sorcerer' | 'Spiritborn';
+export type ClassId = 'Paladin' | 'Barbarian' | 'Druid' | 'Necromancer' | 'Rogue' | 'Sorcerer' | 'Spiritborn' | 'Warlock';
 
 export const CLASSES: { id: ClassId; mainStat: string; divisor: number }[] = [
   { id: 'Paladin',      mainStat: 'Strength',     divisor: 800 },
@@ -11,6 +11,35 @@ export const CLASSES: { id: ClassId; mainStat: string; divisor: number }[] = [
   { id: 'Rogue',        mainStat: 'Dexterity',    divisor: 800 },
   { id: 'Sorcerer',     mainStat: 'Intelligence', divisor: 800 },
   { id: 'Spiritborn',   mainStat: 'Willpower',    divisor: 800 },
+  { id: 'Warlock',      mainStat: 'Intelligence', divisor: 800 },
+];
+
+// Per-line additive damage inputs (the naked baseline list)
+export interface AdditiveLine {
+  id: string;
+  label: string;
+  value: number;   // decimal e.g. 1.42 = 142%
+  uptime: number;  // 0..1, default 1
+}
+
+export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
+  { id: 'vulnerable',   label: 'Vulnerable Damage',     value: 0, uptime: 1 },
+  { id: 'all',          label: 'All Damage',            value: 0, uptime: 1 },
+  { id: 'physical',     label: 'Physical Damage',       value: 0, uptime: 1 },
+  { id: 'cold',         label: 'Cold Damage',           value: 0, uptime: 1 },
+  { id: 'fire',         label: 'Fire Damage',           value: 0, uptime: 1 },
+  { id: 'lightning',    label: 'Lightning Damage',      value: 0, uptime: 1 },
+  { id: 'poison',       label: 'Poison Damage',         value: 0, uptime: 1 },
+  { id: 'shadow',       label: 'Shadow Damage',         value: 0, uptime: 1 },
+  { id: 'holy',         label: 'Holy Damage',           value: 0, uptime: 1 },
+  { id: 'dot',          label: 'Damage over Time',      value: 0, uptime: 1 },
+  { id: 'close',        label: 'Damage to Close',       value: 0, uptime: 0.5 },
+  { id: 'distant',      label: 'Damage to Distant',     value: 0, uptime: 0.5 },
+  { id: 'elites',       label: 'Damage to Elites',      value: 0, uptime: 0.4 },
+  { id: 'cc',           label: 'Damage to CC’d',         value: 0, uptime: 0.7 },
+  { id: 'healthy',      label: 'Damage to Healthy',     value: 0, uptime: 0.5 },
+  { id: 'trapped',      label: 'Damage to Trapped',     value: 0, uptime: 0.5 },
+  { id: 'imbued',       label: 'Imbued Damage',         value: 0, uptime: 1 },
 ];
 
 // Bucket identifiers
@@ -59,7 +88,7 @@ export interface Build {
   classId: ClassId;
   baseMainStat: number;       // main stat from naked character (paragon + base)
   extraMainStat: number;      // from charms/talisman
-  additivePool: number;       // % from naked character (sum of all additive lines, pre-uptime-weighted), as decimal
+  additiveLines: AdditiveLine[]; // per-line additive damage inputs (naked baseline)
   skillCoefL1: number;        // e.g. 0.45
   skillRanks: number;         // e.g. 15
   extraSkillRanks: number;    // from items/effects
@@ -70,13 +99,15 @@ export interface Build {
   slots: Slot[];
   // Standalone unique/aspect multipliers (each its own factor)
   extraMultipliers: { label: string; value: number }[]; // value as decimal e.g. 0.30 = 30%[x]
+  // Comparison snapshot (frozen build object for delta display)
+  snapshot?: Build | null;
 }
 
 export const DEFAULT_BUILD: Build = {
   classId: 'Paladin',
   baseMainStat: 800,
   extraMainStat: 0,
-  additivePool: 0,
+  additiveLines: structuredClone(DEFAULT_ADDITIVE_LINES),
   skillCoefL1: 0.45,
   skillRanks: 5,
   extraSkillRanks: 0,
@@ -86,6 +117,7 @@ export const DEFAULT_BUILD: Build = {
   weaponBaseDmg: 3000,
   slots: structuredClone(DEFAULT_SLOTS),
   extraMultipliers: [],
+  snapshot: null,
 };
 
 // ---------------- Calc ----------------
@@ -153,10 +185,11 @@ export function calc(b: Build): Calc {
   // Per-sheet: ADMG bundles ALLM + NONPHYS (elemental + phys + all)
   const allm = 1 + sum(b.slots, 'ALLM') + sum(b.slots, 'NONPHYS');
 
-  // Additive bucket (one big pool)
+  // Additive bucket (one big pool); per-line entries with uptime weighting
   const slotAdd = sum(b.slots, 'ADDITIVE');
   const critAdd = sum(b.slots, 'CRITADD');
-  const additiveTotal = 1 + b.additivePool + slotAdd;
+  const nakedAdd = (b.additiveLines || []).reduce((acc, l) => acc + l.value * (l.uptime ?? 1), 0);
+  const additiveTotal = 1 + nakedAdd + slotAdd;
   const additiveCritTotal = additiveTotal + critAdd; // crit-only additive joins on crit
 
   // Weapon damage
