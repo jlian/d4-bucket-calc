@@ -429,60 +429,62 @@ function bucketsCard() {
     : presetScenarios().find(s => s.id === 'vuln_elite')!;
 
   type Row = { name: string; current: string; gain: number; explain: string };
+  const fmtBucketPct = (mult: number) => `+${((mult - 1) * 100).toFixed(0)}%`;
+  const cls = classFor(build);
   const rows: Row[] = [
     {
       name: 'Crit Strike Damage [×]',
-      current: `bucket = ×${c.csdm.toFixed(2)}`,
+      current: `bucket sum = ${fmtBucketPct(c.csdm)} (×${c.csdm.toFixed(2)})`,
       gain: weightFor(build, 'CSDM', BUCKET_META.CSDM.typicalRoll, refScenario),
-      explain: `Adding a +25% [×]CSDM affix grows your CSDM bucket from ×${c.csdm.toFixed(2)} to ×${(c.csdm + 0.25*1.75).toFixed(2)}.`,
+      explain: `Adding a typical greater-affix CSDM roll (≈44%) bumps the bucket to ${fmtBucketPct(c.csdm + 0.25*1.75)}.`,
     },
     {
       name: 'Vulnerable Damage [×]',
-      current: `bucket = ×${c.vdm.toFixed(2)}`,
+      current: `bucket sum = ${fmtBucketPct(c.vdm)} (×${c.vdm.toFixed(2)})`,
       gain: weightFor(build, 'VDM', BUCKET_META.VDM.typicalRoll, refScenario),
-      explain: `Adding a +14% [×]VDM affix grows your VDM bucket from ×${c.vdm.toFixed(2)} to ×${(c.vdm + 0.14*1.75).toFixed(2)} (only when target is vulnerable).`,
+      explain: `Adding a typical GA Vulnerable roll (≈25%) bumps the bucket to ${fmtBucketPct(c.vdm + 0.14*1.75)} (only when target is vulnerable).`,
     },
     {
       name: 'Damage over Time [×]',
-      current: `bucket = ×${c.dotm.toFixed(2)}`,
+      current: `bucket sum = ${fmtBucketPct(c.dotm)} (×${c.dotm.toFixed(2)})`,
       gain: weightFor(build, 'DOTM', BUCKET_META.DOTM.typicalRoll, refScenario),
-      explain: `Adding a +30% [×]DoT affix; only matters for DoT skills.`,
+      explain: `Adding a typical GA DoT roll (≈53%); only matters for DoT skills.`,
     },
     {
       name: 'All / Element Damage [×]',
-      current: `bucket = ×${c.allm.toFixed(2)}`,
+      current: `bucket sum = ${fmtBucketPct(c.allm)} (×${c.allm.toFixed(2)})`,
       gain: weightFor(build, 'ALLM', BUCKET_META.ALLM.typicalRoll, refScenario),
-      explain: `Adding a +10% [×]All-Damage or matching elemental affix grows ALLM from ×${c.allm.toFixed(2)} to ×${(c.allm + 0.10*1.75).toFixed(2)}.`,
+      explain: `Adding a typical GA All-Damage roll (≈18%) bumps the bucket to ${fmtBucketPct(c.allm + 0.10*1.75)}.`,
     },
     {
       name: 'Main Stat',
-      current: `×${c.mainStatMult.toFixed(2)} (${c.mainStatSum} ${classFor(build).mainStat})`,
+      current: `×${c.mainStatMult.toFixed(2)} multiplier (${c.mainStatSum} ${cls.mainStat})`,
       gain: weightFor(build, 'MAINSTAT', BUCKET_META.MAINSTAT.typicalRoll, refScenario),
-      explain: `Adding +180 ${classFor(build).mainStat} grows multiplier from ×${c.mainStatMult.toFixed(3)} to ×${(1 + (c.mainStatSum + 180*1.75)/classFor(build).divisor).toFixed(3)}.`,
+      explain: `Adding +${Math.round(180*1.75)} ${cls.mainStat} grows multiplier to ×${(1 + (c.mainStatSum + 180*1.75)/cls.divisor).toFixed(3)}.`,
     },
     {
       name: 'Crit Strike Chance',
       current: `${fmtPct(c.critChance, 1)}`,
       gain: weightFor(build, 'CRITCHANCE', BUCKET_META.CRITCHANCE.typicalRoll, refScenario),
-      explain: `Adding +8.5% Crit Chance: ${c.critChance >= 1 ? 'already capped at 100% — no gain' : `crit rate ${fmtPct(c.critChance, 1)} → ${fmtPct(Math.min(1, c.critChance + 0.085*1.75), 1)}`}.`,
+      explain: c.critChance >= 1 ? 'Already capped at 100% — no gain from more.' : `Adding a typical GA Crit Chance roll (≈15%) takes you to ${fmtPct(Math.min(1, c.critChance + 0.085*1.75), 1)}.`,
     },
     {
       name: 'Weapon Damage',
       current: `${fmtNum(c.weaponDmg)}`,
       gain: weightFor(build, 'WEPDMG', BUCKET_META.WEPDMG.typicalRoll, refScenario),
-      explain: `Adding a +196 Weapon Damage temper grows from ${fmtNum(c.weaponDmg)} to ${fmtNum(c.weaponDmg + 196*1.75)} (multiplies everything).`,
+      explain: `A +${Math.round(196*1.75)} Weapon Damage temper grows you to ${fmtNum(c.weaponDmg + 196*1.75)} (multiplies everything).`,
     },
     {
       name: 'Skill Ranks',
       current: `${c.totalSkillRanks} ranks (×${c.skillCoef.toFixed(3)} skill coef)`,
       gain: weightFor(build, 'SKILLRANK', BUCKET_META.SKILLRANK.typicalRoll, refScenario),
-      explain: `Adding +4 skill ranks bumps coef thanks to per-rank scaling and 5-rank step bonuses.`,
+      explain: `+4 skill ranks bumps coef thanks to per-rank scaling and 5-rank step bonuses.`,
     },
   ];
   rows.sort((a, b) => b.gain - a.gain);
 
   card.append(el('p', { class: 'text-xs text-zinc-600 italic mb-2' },
-    `Calculated against scenario: “${refScenario.label}” (change crit/DoT toggle to flip).`,
+    `Calculated against scenario: “${refScenario.label}” (toggle DoT/crit on the left to flip).`,
   ));
 
   const table = el('table', { class: 'w-full text-sm' });
@@ -508,16 +510,27 @@ function bucketsCard() {
   table.append(tb);
   card.append(table);
 
-  // Legend / how to read this
   card.append(el('details', { class: 'mt-3 text-xs text-zinc-500' },
     el('summary', { class: 'cursor-pointer text-zinc-400' }, 'How to read this'),
     el('div', { class: 'mt-2 space-y-2 text-zinc-400' },
-      el('p', {}, 'Each “stat type” goes into its own ', el('strong', {}, 'bucket'), ' (a sum or multiplier in the damage formula). The full formula multiplies all buckets together. So adding to a small bucket gives more damage than adding the same amount to a big one.'),
       el('p', {},
-        el('strong', {}, 'Example: '), 'If your Crit Damage [×] bucket is at ×2.0 and you add a +25% affix, it becomes ×2.44 (a 22% damage gain). If your Vulnerable [×] bucket is only at ×1.2 and you add the same +14% affix, it becomes ×1.45 (a 21% damage gain). Even though Vulnerable’s number is smaller, it costs less per affix to grow.',
+        'Each “stat type” goes into its own ', el('strong', {}, 'bucket'), ' — a sum of all matching affixes that becomes one factor in the damage formula. Adding to a small bucket gives a bigger % damage gain than adding the same amount to a big one.',
       ),
       el('p', {},
-        el('strong', {}, 'TLDR:'), ' green/yellow rows on top = where to spend your next slot. Adding more affixes to the same bucket gives diminishing returns.',
+        el('strong', {}, 'Worked example: '),
+        'Say your CSDM bucket has ',
+        el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '+150% from gear'),
+        ' → the bucket multiplier is ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '1 + 1.50 = ×2.50'), '. ',
+        'Adding a +25% CSDM affix takes the sum to +175%, so the multiplier becomes ×2.75. ',
+        'Damage gain on crits = ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '2.75 / 2.50 = +10%'), '.',
+      ),
+      el('p', {},
+        'Now if your VDM bucket only has +20% (×1.20) and you add the same +25% affix, the bucket goes to ×1.45. ',
+        'Damage gain = ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '1.45 / 1.20 = +21%'), — ',
+        el('strong', {}, 'twice as good '), 'because the bucket was smaller.',
+      ),
+      el('p', {},
+        el('strong', {}, 'About the table: '), 'The percent shown uses a typical greater-affix roll (~1.75× a normal roll, since GA values are higher). Top rows = best slot to spend next.',
       ),
     ),
   ));
