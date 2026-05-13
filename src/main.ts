@@ -99,8 +99,6 @@ function mount() {
   left.append(charmsCard());
   left.append(glyphsCard());
   left.append(paragonContributionsCard());
-  left.append(extraAdditiveCard());
-  left.append(extraMultsCard());
   main.append(left);
 
   const right = el('div', { id: 'outputs', class: 'space-y-6 lg:sticky lg:top-20 lg:self-start' });
@@ -215,7 +213,7 @@ function nakedBaselineCard() {
 }
 
 // ---------- Card 3: Gear Slots ----------
-const CHARM_IDS = new Set(['charmU', 'charm1', 'charm2', 'charm3', 'charm4', 'charm5', 'charm6', 'seal']);
+const CHARM_IDS = new Set(['charm1', 'charm2', 'charm3', 'charm4', 'charm5', 'charm6', 'seal']);
 const GLYPH_IDS = new Set(['glyph1', 'glyph2', 'glyph3', 'glyph4', 'glyph5']);
 
 function slotsCard() {
@@ -235,9 +233,9 @@ function slotsCard() {
 }
 
 function charmsCard() {
-  const card = sectionCard('Charms & Seal (Lord of Hatred)',
-    'Unique charm + 6 set charms + Horadric Seal. Each can carry affixes that go into damage buckets. Set bonuses (e.g., Light’s Epiphany 5pc x500%) usually go into the Standalone Multipliers card below.');
-  const order = ['charmU','charm1','charm2','charm3','charm4','charm5','charm6','seal'];
+  const card = sectionCard('Charms & Seal',
+    '6 charm slots + Horadric Seal. Each can carry affixes that go into damage buckets. Use the x% Standalone Multiplier (aspect/unique) bucket type for things like 5pc set bonuses (e.g., x500% Disciple damage).');
+  const order = ['charm1','charm2','charm3','charm4','charm5','charm6','seal'];
   for (const id of order) {
     const slot = build.slots.find(s => s.id === id);
     if (slot) card.append(slotBlock(slot));
@@ -297,7 +295,6 @@ function slotBlock(slot: Slot) {
   slot.affixes.forEach((a, idx) => {
     const row = el('div', { class: 'flex flex-wrap sm:flex-nowrap gap-2 mb-1.5 items-center min-w-0' });
     const sel = el('select', { class: inputCls() + ' w-full sm:flex-1 min-w-0' }) as HTMLSelectElement;
-    // Sort dropdown alphabetically (excluding hidden buckets), with 'none' / first state stable
     const candidates = BUCKET_ORDER.filter(b => isWeapon || (b !== 'WEPDMG' && b !== 'GEM'));
     candidates.sort((x, y) => BUCKET_META[x].label.localeCompare(BUCKET_META[y].label));
     for (const b of candidates) {
@@ -320,48 +317,16 @@ function slotBlock(slot: Slot) {
     del.addEventListener('click', () => { slot.affixes.splice(idx, 1); mount(); });
     row.append(del);
     wrap.append(row);
+
+    // Optional label row — shown for EXTRAMULT / ADDITIVE / GEM / MAINSTAT_PCT where it helps document what the entry is
+    const labelable = a.bucket === 'EXTRAMULT' || a.bucket === 'ADDITIVE' || a.bucket === 'MAINSTAT_PCT' || a.bucket === 'GEM';
+    if (labelable) {
+      const lblRow = el('div', { class: 'flex pl-0 sm:pl-1 mb-2' });
+      lblRow.append(textInput(() => a.label ?? '', v => { a.label = v; }, { w: 'w-full', placeholder: 'Optional label (e.g. “Heir of Perdition”)' }));
+      wrap.append(lblRow);
+    }
   });
   return wrap;
-}
-
-// ---------- Extra Additive (free-form) ----------
-function extraAdditiveCard() {
-  const card = sectionCard('Extra Additive Damage',
-    'Free-form list for any "+%" damage that isn\'t in the standard list (e.g., skill-tag bonuses from aspects).');
-  build.extraAdditive.forEach((m, idx) => {
-    const row = el('div', { class: 'flex gap-2 mb-2 items-center' });
-    row.append(textInput(() => m.label, v => m.label = v, { w: 'flex-1', placeholder: 'Name' }));
-    row.append(pctInput(() => m.value, v => m.value = v, { w: 'w-24' }));
-    row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
-    const del = el('button', { class: 'text-zinc-500 hover:text-red-400 px-2' }, '✕');
-    del.addEventListener('click', () => { build.extraAdditive.splice(idx, 1); mount(); });
-    row.append(del);
-    card.append(row);
-  });
-  const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-1 rounded border border-amber-700/50 mt-1' }, '+ Add Entry');
-  addBtn.addEventListener('click', () => { build.extraAdditive.push({ label: '', value: 0 }); mount(); });
-  card.append(addBtn);
-  return card;
-}
-
-// ---------- Standalone multipliers ----------
-function extraMultsCard() {
-  const card = sectionCard('Standalone x% Multipliers',
-    'For aspects/uniques that grant a flat damage multiplier (like Grandfather x100% or Heir of Perdition x80%). Each one its own factor in the formula. ⚠️ Do NOT use this for “x% Main Stat” (use the +% Main Stat Mult affix on a slot instead) or for affixes that share a named bucket like Critical Strike Damage Mult / Vulnerable Damage Mult — those need to land in their bucket via a slot.');
-  build.extraMultipliers.forEach((m, idx) => {
-    const row = el('div', { class: 'flex gap-2 mb-2 items-center' });
-    row.append(textInput(() => m.label, v => m.label = v, { w: 'flex-1', placeholder: 'Name' }));
-    row.append(pctInput(() => m.value, v => m.value = v, { w: 'w-24' }));
-    row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
-    const del = el('button', { class: 'text-zinc-500 hover:text-red-400 px-2' }, '✕');
-    del.addEventListener('click', () => { build.extraMultipliers.splice(idx, 1); mount(); });
-    row.append(del);
-    card.append(row);
-  });
-  const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-1 rounded border border-amber-700/50 mt-1' }, '+ Add Multiplier');
-  addBtn.addEventListener('click', () => { build.extraMultipliers.push({ label: '', value: 0 }); mount(); });
-  card.append(addBtn);
-  return card;
 }
 
 // ---------- OUTPUT: Scenarios ----------
@@ -543,7 +508,7 @@ function statsCard() {
     ['Vulnerable Damage Mult', pctOf(c.vdm)],
     ['Damage Over Time Mult', pctOf(c.dotm)],
     ['All / Element Damage Mult', pctOf(c.allm)],
-    ['Standalone [×] product', `×${c.extraMultProduct.toFixed(3)} (${build.extraMultipliers.length} aspects/uniques)`],
+    ['Standalone x% product', `×${c.extraMultProduct.toFixed(3)}`],
   ];
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
@@ -661,7 +626,18 @@ function workedExampleCard(): HTMLElement {
 
   addRow('Weapon Damage', num(c.weaponDmg));
   addRow(`${cls.mainStat} multiplier`, `${c.mainStatSum} → (1 + ${c.mainStatSum}/${cls.divisor}) = ${fmtMult(c.mainStatMult)}`);
-  addRow('Additive bucket (always-on)', `${fmtAdd(additive)} → ${fmtMult(1 + additive)}`);
+  // Break down the additive bucket so user can see what's in it for this scenario
+  const addParts: string[] = [];
+  for (const l of build.additiveLines) {
+    if (l.isCritOnly) continue;
+    if (l.applies(conds) && l.value > 0) addParts.push(`${l.label}: ${fmtAdd(l.value).slice(1)}`);
+  }
+  // ADDITIVE-bucket affixes from any slot
+  let slotAddSum = 0;
+  for (const slot of build.slots) for (const aa of slot.affixes) if (aa.bucket === 'ADDITIVE') slotAddSum += aa.value;
+  if (slotAddSum > 0) addParts.push(`gear/extra ADDITIVE affixes: ${(slotAddSum*100).toFixed(1)}%`);
+  const addBreakdown = addParts.length ? ` — includes ${addParts.join(', ')}` : '';
+  addRow('Additive bucket (always-on + scenario-conditional)', `${fmtAdd(additive)} → ${fmtMult(1 + additive)}${addBreakdown}`);
   if (!scenario.isDot && critAdd > 0) {
     addRow('Crit-only additive bonus', `${fmtAdd(critAdd)} (added on crit)`);
   }

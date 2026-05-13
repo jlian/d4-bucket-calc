@@ -33,14 +33,14 @@ function makeReferencePaladin(): Build {
     enemyDR: 0.2,
     disableCrit: false,
     additiveLines: DEFAULT_BUILD.additiveLines.map(l => ({ ...l })),
-    extraAdditive: [
-      { label: 'Extra Additive', value: 2.127 },
-      { label: 'Damage with Trap', value: 1.0 },
-      { label: 'vs Trapped', value: 1.89 },
-    ],
+    extraAdditive: [],
     extraMultipliers: [],
     slots: [
-      { id: 'helm',   name: 'Helm',   affixes: [] },
+      { id: 'helm',   name: 'Helm',   affixes: [
+        { bucket: 'ADDITIVE', value: 2.127 },
+        { bucket: 'ADDITIVE', value: 1.0 },
+        { bucket: 'ADDITIVE', value: 1.89 },
+      ] },
       { id: 'chest',  name: 'Chest',  affixes: [{ bucket: 'MAINSTAT', value: 392 }] },
       { id: 'pants',  name: 'Pants',  affixes: [] },
       { id: 'boots',  name: 'Boots',  affixes: [{ bucket: 'MAINSTAT', value: 151 }] },

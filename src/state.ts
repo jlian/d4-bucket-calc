@@ -70,6 +70,32 @@ function reconcileWeaponClass(slots: import('./calc').Slot[], classId: string): 
   }
 }
 
+function migrateSlotsAndExtras(j: any): import('./calc').Slot[] {
+  const slots = migrateSlots(j.slots);
+  // Migrate legacy extraMultipliers -> EXTRAMULT affixes on the paragon slot
+  const extraMults = validStringList(j.extraMultipliers, ['label', 'value']).map((m: any) => ({
+    bucket: 'EXTRAMULT' as const, value: validNumber(m.value, 0), label: String(m.label ?? ''),
+  }));
+  const extraAdds = validStringList(j.extraAdditive, ['label', 'value']).map((m: any) => ({
+    bucket: 'ADDITIVE' as const, value: validNumber(m.value, 0), label: String(m.label ?? ''),
+  }));
+  if (extraMults.length || extraAdds.length) {
+    const para = slots.find(s => s.id === 'paragon');
+    if (para) para.affixes.push(...extraMults, ...extraAdds);
+  }
+  // Legacy charmU -> charm1
+  const legacyU = (j.slots || []).find((s: any) => s && s.id === 'charmU');
+  if (legacyU && Array.isArray(legacyU.affixes)) {
+    const charm1 = slots.find(s => s.id === 'charm1');
+    if (charm1 && charm1.affixes.length === 0) {
+      const aff = legacyU.affixes.filter((a: any) => a && typeof a.bucket === 'string')
+        .map((a: any) => ({ bucket: a.bucket, value: validNumber(a.value, 0), ...(typeof a.label === 'string' ? { label: a.label } : {}) }));
+      charm1.affixes = aff;
+    }
+  }
+  return slots;
+}
+
 function serialToBuild(j: any): Build {
   if (!j || typeof j !== 'object') throw new Error('not an object');
   const knownClass = typeof j.classId === 'string' && CLASSES.some(c => c.id === j.classId);
@@ -87,9 +113,7 @@ function serialToBuild(j: any): Build {
     weaponSpeedOverride: j.weaponSpeedOverride == null ? null : validNumber(j.weaponSpeedOverride, 0),
     disableCrit: !!j.disableCrit,
     enemyDR: validNumber(j.enemyDR, 0.2),
-    slots: migrateSlots(j.slots),
-    extraMultipliers: validStringList(j.extraMultipliers, ['label', 'value']).map((m: any) => ({ label: String(m.label ?? ''), value: validNumber(m.value, 0) })),
-    extraAdditive: validStringList(j.extraAdditive, ['label', 'value']).map((m: any) => ({ label: String(m.label ?? ''), value: validNumber(m.value, 0) })),
+    slots: migrateSlotsAndExtras(j),
     additiveLines: rehydrateLines(Array.isArray(j.additiveLines) ? j.additiveLines : undefined),
     snapshot: j.snapshot ? safeSerialToBuild(j.snapshot) : null,
   };
@@ -152,10 +176,10 @@ export function loadInitialBuild(): Build {
   return loadLocal() ?? defaultBuild();
 }
 
-export function defaultBuild(): Build { return { ...DEFAULT_BUILD, additiveLines: cloneDefaultLines(), slots: structuredClone(DEFAULT_BUILD.slots), extraMultipliers: [], extraAdditive: [], snapshot: null }; }
+export function defaultBuild(): Build { return { ...DEFAULT_BUILD, additiveLines: cloneDefaultLines(), slots: structuredClone(DEFAULT_BUILD.slots), snapshot: null }; }
 
 export function cloneBuild(b: Build): Build {
-  return { ...b, additiveLines: b.additiveLines.map(l => ({ ...l })), slots: structuredClone(b.slots), extraMultipliers: structuredClone(b.extraMultipliers), extraAdditive: structuredClone(b.extraAdditive), snapshot: b.snapshot ? cloneBuild(b.snapshot) : null };
+  return { ...b, additiveLines: b.additiveLines.map(l => ({ ...l })), slots: structuredClone(b.slots), snapshot: b.snapshot ? cloneBuild(b.snapshot) : null };
 }
 
 export function persist(b: Build) {

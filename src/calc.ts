@@ -87,15 +87,13 @@ export const DEFAULT_SLOTS: Slot[] = [
   { id: 'wep4',    name: 'Weapon 4', weaponTypeId: 'none', affixes: [] },
   // Catch-all for anything that contributes to a named bucket without being on equipped armor/jewelry/weapons.
   { id: 'paragon', name: 'Paragon Nodes (legendary / rare / magic)', affixes: [] },
-  // Charm slots (LoH): 1 unique + 6 set
-  { id: 'charmU',  name: 'Unique Charm', affixes: [] },
-  { id: 'charm1',  name: 'Set Charm 1', affixes: [] },
-  { id: 'charm2',  name: 'Set Charm 2', affixes: [] },
-  { id: 'charm3',  name: 'Set Charm 3', affixes: [] },
-  { id: 'charm4',  name: 'Set Charm 4', affixes: [] },
-  { id: 'charm5',  name: 'Set Charm 5', affixes: [] },
-  { id: 'charm6',  name: 'Set Charm 6', affixes: [] },
-  // Horadric Seal
+  // Charm slots: 6 generic charms + 1 horadric seal
+  { id: 'charm1',  name: 'Charm 1', affixes: [] },
+  { id: 'charm2',  name: 'Charm 2', affixes: [] },
+  { id: 'charm3',  name: 'Charm 3', affixes: [] },
+  { id: 'charm4',  name: 'Charm 4', affixes: [] },
+  { id: 'charm5',  name: 'Charm 5', affixes: [] },
+  { id: 'charm6',  name: 'Charm 6', affixes: [] },
   { id: 'seal',    name: 'Horadric Seal', affixes: [] },
   // Glyphs (5 max for Paladin/most classes)
   { id: 'glyph1',  name: 'Glyph 1', affixes: [] },
@@ -158,17 +156,15 @@ export interface Build {
   baseMainStat: number;
   extraMainStat: number;
   additiveLines: AdditiveLine[];
-  extraAdditive: { label: string; value: number }[];
   skillName: string;
-  skillDamagePct: number;       // current in-game skill damage % (e.g., 4.03 for 403%)
-  totalSkillRanks: number;      // user-entered total ranks; used for + Skill Ranks affix preview
+  skillDamagePct: number;
+  totalSkillRanks: number;
   baseCritChance: number;
   attackSpeedBonus: number;
   weaponSpeedOverride: number | null;
   disableCrit: boolean;
   enemyDR: number;
   slots: Slot[];
-  extraMultipliers: { label: string; value: number }[];
   snapshot?: Build | null;
 }
 
@@ -177,9 +173,8 @@ export const DEFAULT_BUILD: Build = {
   baseMainStat: 800,
   extraMainStat: 0,
   additiveLines: cloneDefaultLines(),
-  extraAdditive: [],
   skillName: 'Main Skill',
-  skillDamagePct: 0.45,        // 45% (rank-1 default; user typically overrides with their in-game value)
+  skillDamagePct: 0.45,
   totalSkillRanks: 5,
   baseCritChance: 0.05,
   attackSpeedBonus: 0,
@@ -187,7 +182,6 @@ export const DEFAULT_BUILD: Build = {
   disableCrit: false,
   enemyDR: 0.2,
   slots: structuredClone(DEFAULT_SLOTS),
-  extraMultipliers: [],
   snapshot: null,
 };
 
@@ -267,7 +261,9 @@ export function calc(b: Build): Calc {
   const weaponSpeed = (b.weaponSpeedOverride && b.weaponSpeedOverride > 0) ? b.weaponSpeedOverride : wd.speed;
   const effectiveAttackRate = weaponSpeed * (1 + (b.attackSpeedBonus || 0));
 
-  const extraMultProduct = b.extraMultipliers.reduce((p, m) => p * (1 + m.value), 1);
+  // Standalone EXTRAMULT affixes from any slot (each its own factor in the formula)
+  let extraMultProduct = 1;
+  for (const slot of b.slots) for (const a of slot.affixes) if (a.bucket === 'EXTRAMULT') extraMultProduct *= (1 + a.value);
 
   return { mainStatSum, mainStatMult, csdm, vdm, dotm, allm, critChance, totalSkillRanks, skillCoef, weaponDmg: wd.dmg, weaponSpeed, effectiveAttackRate, extraMultProduct };
 }
@@ -288,7 +284,6 @@ export function additiveForScenario(b: Build, conditions: ScenarioConditions): n
     if (l.isCritOnly) continue;
     if (l.applies(conditions)) add += l.value;
   }
-  add += b.extraAdditive.reduce((a, l) => a + l.value, 0);
   add += sumAffixes(b.slots, 'ADDITIVE');
   return add;
 }
