@@ -332,26 +332,29 @@ function slotBlock(slot: Slot) {
     sel.addEventListener('change', () => { a.bucket = sel.value as Bucket; mount(); });
     row.append(sel);
 
-    const isPct = BUCKET_META[a.bucket].isPercent;
-    if (isPct) {
-      row.append(pctInput(() => a.value, v => a.value = v, { w: 'w-24' }));
-      row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
-    } else {
-      row.append(numInput(() => a.value, v => a.value = v, { w: 'w-28' }));
+    // Optional inline label — shown for buckets where it helps document what the entry is.
+    // Sits between the bucket dropdown and the value so it shares the row instead of wrapping below.
+    const labelable = a.bucket === 'EXTRAMULT' || a.bucket === 'ADDITIVE' || a.bucket === 'MAINSTAT_PCT' || a.bucket === 'GEM';
+    if (labelable) {
+      row.append(textInput(() => a.label ?? '', v => { a.label = v; }, { w: 'w-full sm:flex-1 min-w-0', placeholder: 'Optional label (e.g. “Heir of Perdition”)' }));
     }
 
-    const del = el('button', { class: 'text-zinc-500 hover:text-red-400 px-2' }, '✕');
+    // Number input + unit suffix as a fixed-width pair so percent and non-percent rows align.
+    const isPct = BUCKET_META[a.bucket].isPercent;
+    const valWrap = el('div', { class: 'flex items-center gap-1 shrink-0' });
+    if (isPct) {
+      valWrap.append(pctInput(() => a.value, v => a.value = v, { w: 'w-20 text-right' }));
+    } else {
+      valWrap.append(numInput(() => a.value, v => a.value = v, { w: 'w-20 text-right' }));
+    }
+    // Always render a fixed-width unit slot so the X button lines up across rows.
+    valWrap.append(el('span', { class: 'text-zinc-600 text-xs w-3 inline-block' }, isPct ? '%' : ''));
+    row.append(valWrap);
+
+    const del = el('button', { class: 'text-zinc-500 hover:text-red-400 px-2 shrink-0' }, '✕');
     del.addEventListener('click', () => { slot.affixes.splice(idx, 1); mount(); });
     row.append(del);
     wrap.append(row);
-
-    // Optional label row — shown for EXTRAMULT / ADDITIVE / GEM / MAINSTAT_PCT where it helps document what the entry is
-    const labelable = a.bucket === 'EXTRAMULT' || a.bucket === 'ADDITIVE' || a.bucket === 'MAINSTAT_PCT' || a.bucket === 'GEM';
-    if (labelable) {
-      const lblRow = el('div', { class: 'flex pl-0 sm:pl-1 mb-2' });
-      lblRow.append(textInput(() => a.label ?? '', v => { a.label = v; }, { w: 'w-full', placeholder: 'Optional label (e.g. “Heir of Perdition”)' }));
-      wrap.append(lblRow);
-    }
   });
   return wrap;
 }
