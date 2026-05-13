@@ -330,56 +330,75 @@ function slotBlock(slot: Slot) {
 }
 
 // ---------- OUTPUT: Scenarios ----------
+// Transient UI state for the scenarios card (not persisted)
+const scenarioState = { vulnerable: true, elites: true, close: false, distant: false, cc: false, healthy: false };
+
 function scenariosCard() {
-  const card = sectionCard('Damage by Scenario');
+  const card = sectionCard('Damage');
   const c = calc(build);
   if (c.weaponDmg === 0) {
     card.append(el('p', { class: 'text-xs text-amber-400' }, '⚠️ Pick a weapon type in your weapon slot to enable damage output.'));
     return card;
   }
 
-  const scenarios = presetScenarios();
-  // For DoT builds, hide non-DoT non-condition rows
-  const filtered = build.disableCrit
-    ? scenarios.filter(s => s.isDot || Object.keys(s.conditions).length > 0 || s.id === 'plain')
-    : scenarios;
+  // Conditional toggles
+  const toggleWrap = el('div', { class: 'flex flex-wrap gap-x-3 gap-y-1 mb-3' });
+  const toggles: { key: keyof typeof scenarioState; label: string }[] = [
+    { key: 'vulnerable', label: 'Vulnerable' },
+    { key: 'elites',     label: 'Elite' },
+    { key: 'close',      label: 'Close' },
+    { key: 'distant',    label: 'Distant' },
+    { key: 'cc',         label: 'CC’d' },
+    { key: 'healthy',    label: 'Healthy' },
+  ];
+  for (const t of toggles) {
+    const lbl = el('label', { class: 'flex items-center gap-1 text-xs text-zinc-400 cursor-pointer' });
+    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
+    cb.checked = !!scenarioState[t.key];
+    cb.addEventListener('change', () => { scenarioState[t.key] = cb.checked; refreshOutputs(); });
+    lbl.append(cb, document.createTextNode(t.label));
+    toggleWrap.append(lbl);
+  }
+  card.append(toggleWrap);
 
-  const tbl = el('table', { class: 'w-full text-sm' });
-  tbl.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
-    el('th', { class: 'text-left py-1 font-normal' }, 'Scenario'),
-    el('th', { class: 'text-right py-1 font-normal' }, 'Avg dmg'),
-  )));
-  const tb = el('tbody');
+  // Compute scenarios
+  const conds = { ...scenarioState };
+  const scenarioHit:  any = { id: 'hit',  label: 'hit',  conditions: conds };
+  const scenarioDot:  any = { id: 'dot',  label: 'dot',  conditions: conds, isDot: true };
+  const hitDmg = scenarioDamageNoCrit(build, scenarioHit);
+  const critDmg = build.disableCrit ? 0 : scenarioCritOnly(build, scenarioHit);
+  const dotDmg = build.disableCrit ? scenarioDamage(build, scenarioDot) : 0;
 
-  // Always include "Plain (no crit)" first as a reference
+  // Big readout (matches in-game: white = hit, yellow = crit)
+  const row = el('div', { class: 'grid grid-cols-2 gap-3 mb-1' });
+  row.append(el('div', { class: 'text-center' },
+    el('div', { class: 'text-xs text-zinc-500' }, 'Hit'),
+    el('div', { class: 'text-2xl font-bold text-zinc-100 font-mono' }, build.disableCrit ? fmtBigNum(dotDmg) : fmtBigNum(hitDmg)),
+  ));
+  row.append(el('div', { class: 'text-center' },
+    el('div', { class: 'text-xs text-zinc-500' }, build.disableCrit ? 'DoT tick' : 'Crit'),
+    el('div', { class: 'text-2xl font-bold text-amber-400 font-mono' }, build.disableCrit ? fmtBigNum(dotDmg) : fmtBigNum(critDmg)),
+  ));
+  card.append(row);
+
   if (!build.disableCrit) {
-    const plainNoCrit = scenarioDamageNoCrit(build, scenarios.find(s => s.id === 'plain')!);
-    tb.append(el('tr', { class: 'border-b border-zinc-900' },
-      el('td', { class: 'py-1 text-zinc-400' }, 'Plain (no crit, ref)'),
-      el('td', { class: 'py-1 text-right tabular-nums text-zinc-400 font-mono' }, fmtBigNum(plainNoCrit)),
+    const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
+    card.append(el('div', { class: 'text-center text-xs text-zinc-500 mt-1' },
+      `avg @ ${(c.critChance*100).toFixed(1)}% crit → `,
+      el('span', { class: 'text-zinc-300 font-mono' }, fmtBigNum(avg)),
     ));
   }
-  for (const s of filtered) {
-    const dmg = scenarioDamage(build, s);
-    tb.append(el('tr', { class: 'border-b border-zinc-900' },
-      el('td', { class: 'py-1' }, s.label),
-      el('td', { class: 'py-1 text-right tabular-nums text-amber-400 font-mono' }, fmtBigNum(dmg)),
-    ));
-  }
-  tbl.append(tb);
-  card.append(tbl);
 
+  // Snapshot delta
   if (build.snapshot) {
-    const refScenario = filtered[0];
-    const cur = scenarioDamage(build, refScenario);
-    const snapBuild = build.snapshot as Build;
-    const snap = scenarioDamage({ ...snapBuild, snapshot: null } as Build, refScenario);
-    if (snap > 0) {
-      const delta = cur / snap - 1;
+    const snapBuild = { ...build.snapshot, snapshot: null } as Build;
+    const snapHit = scenarioDamageNoCrit(snapBuild, scenarioHit);
+    if (snapHit > 0) {
+      const delta = hitDmg / snapHit - 1;
       const sign = delta >= 0 ? '+' : '';
       const cls = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-zinc-500';
-      card.append(el('div', { class: 'mt-3 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs' },
-        el('span', { class: 'text-zinc-500' }, `📌 "${refScenario.label}" vs snapshot:`),
+      card.append(el('div', { class: 'mt-2 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs' },
+        el('span', { class: 'text-zinc-500' }, '📌 vs snapshot:'),
         el('span', { class: cls + ' font-bold tabular-nums' }, sign + fmtPct(delta, 2)),
       ));
     }
@@ -387,12 +406,17 @@ function scenariosCard() {
   return card;
 }
 
+// Helper: compute a forced-crit hit
+function scenarioCritOnly(b: Build, scenario: any): number {
+  // Pretend crit chance is 1 for a clean crit readout
+  const allCrit = { ...b, baseCritChance: 1, slots: b.slots.map(s => ({ ...s, affixes: s.affixes.filter(a => a.bucket !== 'CRITCHANCE') })) } as Build;
+  return scenarioDamage(allCrit, scenario);
+}
+
 // ---------- OUTPUT: Buckets ----------
 function bucketsCard() {
-  const card = sectionCard('Where to Spend Your Next Slot');
-  card.append(el('p', { class: 'text-xs text-zinc-400 mb-2' },
-    'Each row is a hypothetical affix you could add to your build. The right column shows what % more damage that single affix would give you. Top of the list = best leverage right now.',
-  ));
+  const card = sectionCard('Most Valuable Affixes',
+    'Each row: what a typical fresh affix of this type would gain you. Sorted by impact.');
 
   const c = calc(build);
   if (c.weaponDmg === 0) {
@@ -401,92 +425,46 @@ function bucketsCard() {
   }
   const refScenario = build.disableCrit
     ? presetScenarios().find(s => s.id === 'dot')!
-    : presetScenarios().find(s => s.id === 'vuln_elite')!;
+    : { id: 'live', label: 'current scenario', conditions: { ...scenarioState } } as any;
 
   const cls = classFor(build);
-  // Each row is an actual affix, normalized so they're comparable
-  type Row = { affix: string; bucket?: string; gain: number };
+  type Row = { affix: string; gain: number; warn?: string };
   const rows: Row[] = [
-    { affix: 'x10% Critical Strike Damage Multiplier', bucket: 'on crits', gain: weightFor(build, 'CSDM', 0.10, refScenario) },
-    { affix: 'x10% Vulnerable Damage Multiplier',      bucket: 'vs vulnerable', gain: weightFor(build, 'VDM', 0.10, refScenario) },
-    { affix: 'x10% Damage Over Time Multiplier',       bucket: 'on DoT only', gain: weightFor(build, 'DOTM', 0.10, refScenario) },
-    { affix: 'x10% All / Element Damage Multiplier',   bucket: 'always-on', gain: weightFor(build, 'ALLM', 0.10, refScenario) },
-    { affix: '+10% Critical Strike Damage',            bucket: 'on crits', gain: weightFor(build, 'CRITADD', 0.10, refScenario) },
-    { affix: '+10% Damage (additive bucket)',          bucket: 'always-on', gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) },
-    { affix: `+200 ${cls.mainStat}`,                   bucket: 'main stat', gain: weightFor(build, 'MAINSTAT', 200, refScenario) },
-    { affix: `x10% ${cls.mainStat} Multiplier`,         bucket: 'main stat mult', gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) },
-    { affix: '+10% Critical Strike Chance',            bucket: c.critChance >= 1 ? '⚠️ CAPPED at 100% — wasted slot' : 'crit roll rate', gain: weightFor(build, 'CRITCHANCE', 0.10, refScenario) },
-    { affix: '+196 Weapon Damage Roll',                bucket: 'multiplies all', gain: weightFor(build, 'WEPDMG', 196, refScenario) },
-    { affix: '+5 Skill Ranks',                         bucket: 'skill coef', gain: weightFor(build, 'SKILLRANK', 5, refScenario) },
+    { affix: 'x10% Critical Strike Damage Multiplier', gain: weightFor(build, 'CSDM', 0.10, refScenario) },
+    { affix: 'x10% Vulnerable Damage Multiplier',      gain: weightFor(build, 'VDM', 0.10, refScenario) },
+    { affix: 'x10% Damage Over Time Multiplier',       gain: weightFor(build, 'DOTM', 0.10, refScenario) },
+    { affix: 'x10% All / Element Damage Multiplier',   gain: weightFor(build, 'ALLM', 0.10, refScenario) },
+    { affix: '+10% Critical Strike Damage',            gain: weightFor(build, 'CRITADD', 0.10, refScenario) },
+    { affix: '+10% Damage (additive)',                 gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) },
+    { affix: `+200 ${cls.mainStat}`,                   gain: weightFor(build, 'MAINSTAT', 200, refScenario) },
+    { affix: `x10% ${cls.mainStat} Multiplier`,        gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) },
+    { affix: '+10% Critical Strike Chance',            gain: weightFor(build, 'CRITCHANCE', 0.10, refScenario), warn: c.critChance >= 1 ? 'capped' : undefined },
+    { affix: '+196 Weapon Damage',                     gain: weightFor(build, 'WEPDMG', 196, refScenario) },
+    { affix: '+5 Skill Ranks',                         gain: weightFor(build, 'SKILLRANK', 5, refScenario) },
   ];
   rows.sort((a, b) => b.gain - a.gain);
 
-  card.append(el('p', { class: 'text-xs text-zinc-600 italic mb-2' },
-    `Calculated against scenario: “${refScenario.label}” (toggle DoT/crit on the left to flip).`,
-  ));
-
   const table = el('table', { class: 'w-full text-sm' });
-  table.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
-    el('th', { class: 'text-left py-1 font-normal' }, 'Hypothetical affix'),
-    el('th', { class: 'text-right py-1 font-normal pl-2' }, '% more dmg'),
-  )));
   const tb = el('tbody');
   for (const r of rows) {
     const isHot = r.gain > 0.05, isCold = r.gain < 0.005;
     const gainCls = isHot ? 'text-emerald-400 font-semibold' : isCold ? 'text-zinc-600' : 'text-amber-400';
-    const tr = el('tr', { class: 'border-b border-zinc-900 align-top' });
-    tr.append(
-      el('td', { class: 'py-1.5 min-w-0' },
-        el('div', { class: 'text-zinc-200' }, r.affix),
-        r.bucket ? el('div', { class: 'text-xs text-zinc-600' }, r.bucket) : '',
-      ),
-      el('td', { class: 'py-1.5 text-right tabular-nums pl-2 align-top whitespace-nowrap ' + gainCls }, fmtPct(r.gain)),
-    );
-    tb.append(tr);
+    const left = el('td', { class: 'py-1 min-w-0 text-zinc-200' }, r.affix);
+    if (r.warn) left.append(el('span', { class: 'ml-2 text-xs text-red-400' }, '⚠️ ' + r.warn));
+    tb.append(el('tr', { class: 'border-b border-zinc-900' },
+      left,
+      el('td', { class: 'py-1 text-right tabular-nums pl-2 whitespace-nowrap ' + gainCls }, fmtPct(r.gain)),
+    ));
   }
   table.append(tb);
   card.append(table);
 
-  // Show current bucket sums for reference
   card.append(el('details', { class: 'mt-3 text-xs text-zinc-500' },
-    el('summary', { class: 'cursor-pointer text-zinc-400' }, 'Your current bucket values'),
-    el('div', { class: 'mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 text-zinc-400' },
-      el('div', {}, `Critical Strike Damage Mult: x${((c.csdm-1)*100).toFixed(0)}% (×${c.csdm.toFixed(2)})`),
-      el('div', {}, `Vulnerable Damage Mult: x${((c.vdm-1)*100).toFixed(0)}% (×${c.vdm.toFixed(2)})`),
-      el('div', {}, `Damage Over Time Mult: x${((c.dotm-1)*100).toFixed(0)}% (×${c.dotm.toFixed(2)})`),
-      el('div', {}, `All / Element Damage Mult: x${((c.allm-1)*100).toFixed(0)}% (×${c.allm.toFixed(2)})`),
-      el('div', {}, `Main stat mult: ×${c.mainStatMult.toFixed(3)} (${c.mainStatSum} ${cls.mainStat})`),
-      el('div', {}, `Crit chance: ${fmtPct(c.critChance, 1)}`),
-      el('div', {}, `Weapon damage: ${fmtNum(c.weaponDmg)}`),
-      el('div', {}, `Skill ranks: ${c.totalSkillRanks} (×${c.skillCoef.toFixed(3)} coef)`),
-    ),
-  ));
-
-  card.append(el('details', { class: 'mt-3 text-xs text-zinc-500' },
-    el('summary', { class: 'cursor-pointer text-zinc-400' }, 'How to read this'),
-    el('div', { class: 'mt-2 space-y-2 text-zinc-400' },
-      el('p', {},
-        'Same-named affixes ', el('strong', {}, 'sum into one bucket'), ', then the bucket multiplies into the damage formula. Adding to a small bucket gives a bigger damage gain than adding the same amount to a big one.',
-      ),
-      el('p', {},
-        el('strong', {}, 'Worked example: '),
-        'Say your Crit Damage Mult bucket has +150% from gear → multiplier = ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '1 + 1.50 = ×2.50'), '. ',
-        'Adding a +10% affix takes the sum to +160%, multiplier becomes ×2.60. ',
-        'Damage gain on crits = ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '2.60 / 2.50 = +4%'), '.',
-      ),
-      el('p', {},
-        'If your Vulnerable bucket only has +20% (×1.20) and you add the same +10% affix, the bucket goes to ×1.30. ',
-        'Damage gain on vulnerable = ', el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '1.30 / 1.20 = +8.3%'), ', ',
-        el('strong', {}, 'twice as good '), 'because the bucket was smaller.',
-      ),
-      el('p', {},
-        el('strong', {}, '+ vs x prefix: '),
-        'Critical Strike Damage comes in two flavors. ',
-        el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, '+75% Critical Strike Damage'),
-        ' joins the giant additive damage bucket. ',
-        el('code', { class: 'text-amber-400 bg-zinc-950 px-1 rounded' }, 'x56% Critical Strike Damage Multiplier'),
-        ' joins its own much smaller bucket. The x version is almost always 3-5× more valuable in late game.',
-      ),
+    el('summary', { class: 'cursor-pointer text-zinc-400' }, 'How buckets work'),
+    el('div', { class: 'mt-2 text-zinc-400 space-y-2' },
+      el('p', {}, 'Same-named affixes ', el('strong', {}, 'sum into one bucket'), '; the bucket then multiplies into the damage formula. A small bucket gains more from a new affix than a big one.'),
+      el('p', {}, 'Example: CSDM bucket at +150% (×2.50). Adding x10% → +160% (×2.60). Damage gain = 2.60 / 2.50 = +4%. If your Vulnerable bucket only had +20% (×1.20), same +10% affix goes to ×1.30 → +8.3% — twice as good.'),
+      el('p', {}, el('strong', {}, '+ vs x: '), '“+75% Crit Damage” joins the giant additive bucket. “x56% Crit Damage Multiplier” is its own much smaller bucket. The x version is usually 3-5× more valuable in late game.'),
     ),
   ));
 
@@ -496,8 +474,7 @@ function bucketsCard() {
 function statsCard() {
   const c = calc(build);
   const cls = classFor(build);
-  const card = sectionCard('Stats Summary',
-    'Order mirrors the in-game Offensive tab. “Additive bucket” is a catch-all (sum of all +% damage lines across categories) and the in-game equivalent doesn’t exist — use it only for reference.');
+  const card = sectionCard('Stats Summary');
   const pctOf = (mult: number) => `+${((mult - 1) * 100).toFixed(1)}% (×${mult.toFixed(3)})`;
   const stats: [string, string][] = [
     ['Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : '— pick weapon'],
@@ -535,47 +512,24 @@ function formulaCard() {
   const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (M_{crit} \cdot 1.5)^{c} \cdot (M_{vuln} \cdot 1.2)^{v} \cdot M_{dot}^{d} \cdot M_{all} \cdot (1 - R)`;
   card.append(el('div', { class: 'my-4 flex justify-center overflow-x-auto' }, katexBlock(formula)));
 
-  // Worked example with the user's current build values
-  card.append(workedExampleCard());
-
-  // Variable list
-  const varTable = el('table', { class: 'w-full text-xs my-3' });
-  const varRows: [string, string][] = [
-    ['W', 'Average weapon damage (a property of your equipped weapon)'],
-    ['A', 'Sum of all additive damage % (the giant pool: vuln, elemental, distant, etc., plus +%damage tempers/aspects)'],
-    ['S', `Total main stat (Strength/Dexterity/Intelligence/Willpower); divisor is ${divisor} for ${build.classId}`],
-    ['C', 'Skill damage % at your current rank (taken as-is from the in-game advanced tooltip)'],
-    ['M_i', 'Each standalone [x] aspect/unique multiplier (Grandfather, Godslayer, glyph legendary mults, etc.)'],
-    ['M_{crit}', 'Critical Strike Damage Mult bucket: 1 + sum of all “x% Critical Strike Damage Multiplier” affixes'],
-    ['M_{vuln}', 'Vulnerable Damage Mult bucket: 1 + sum of all “x% Vulnerable Damage Multiplier” affixes'],
-    ['M_{dot}', 'Damage Over Time Mult bucket: 1 + sum of all “x% Damage Over Time Multiplier” affixes'],
-    ['M_{all}', 'All / Element Damage Mult bucket: 1 + sum of all “x% All Damage / Elemental / Physical Multiplier” affixes'],
-    ['R', 'Enemy damage reduction; level-appropriate enemy = 80% (so factor is 0.20)'],
-    ['c, v, d', 'Indicator variables (1 if the hit crits / target is vulnerable / hit is DoT, else 0)'],
-  ];
-  for (const [k, v] of varRows) {
-    varTable.append(el('tr', { class: 'border-b border-zinc-900' },
-      el('td', { class: 'py-1 pr-3 align-top w-16' }, katexInline(k)),
-      el('td', { class: 'py-1 text-zinc-400' }, v as any),
-    ));
-  }
-  card.append(varTable);
-
-  card.append(el('h3', { class: 'font-semibold text-zinc-200 mt-4 mb-2' }, 'Min/max heuristic'));
-  card.append(el('p', { class: 'text-zinc-400 mb-3' },
+  // Min/max heuristic
+  card.append(el('p', { class: 'text-zinc-400 mb-3 text-sm' },
     'For two buckets at sizes ', katexInline('A'), ' and ', katexInline('B'),
-    ', the same affix is ', katexInline('B / A'), ' times more valuable in the smaller one. Spread your multipliers — a product is maximized when its factors are balanced (',
+    ', the same affix is ', katexInline('B / A'), ' times more valuable in the smaller one. Spread your multipliers \u2014 a product is maximized when its factors are balanced (',
     Object.assign(el('a', { href: 'https://en.wikipedia.org/wiki/Inequality_of_arithmetic_and_geometric_means', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'AM-GM inequality' }), ').',
   ));
 
+  // Worked example with current build values (decimals only)
+  card.append(buildPluggedIn());
+
   card.append(el('p', { class: 'text-xs text-zinc-500 mt-4' },
     'Methodology, formulas, weapon damage values, and stacking rules: ',
-    Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=2GKhCdxxqp8', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Avarilyn — Damage Calculation Explained with Proof' }),
+    Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=2GKhCdxxqp8', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Avarilyn \u2014 Damage Calculation Explained with Proof' }),
     ' / ',
     Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=as8y_zGlPrs', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'How to Optimize Damage' }),
     ' / ',
     Object.assign(el('a', { href: 'https://docs.google.com/spreadsheets/d/1qM6XySdTPuoCF4pEndWihBy0oONayRwZZ9WePkn_TFU/', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Original Sheet' }),
-    ' · ',
+    ' \u00b7 ',
     Object.assign(el('a', { href: 'https://github.com/jlian/d4-bucket-calc', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'GitHub source' }),
     '.',
   ));
@@ -583,117 +537,85 @@ function formulaCard() {
   return card;
 }
 
-function workedExampleCard(): HTMLElement {
+function buildPluggedIn(): HTMLElement {
   const wrap = el('div', { class: 'my-4 bg-zinc-950 border border-zinc-800 rounded p-4' });
-  wrap.append(el('h3', { class: 'text-sm font-semibold text-amber-400 mb-2' }, '✨ Your build, plugged in'));
+  wrap.append(el('h3', { class: 'text-sm font-semibold text-amber-400 mb-3' }, '✨ Your build, plugged in'));
   const c = calc(build);
   if (c.weaponDmg === 0) {
     wrap.append(el('p', { class: 'text-xs text-zinc-500' }, 'Pick a weapon type to see the formula with your numbers.'));
     return wrap;
   }
-
   const cls = classFor(build);
-  const scenario = build.disableCrit
-    ? presetScenarios().find(s => s.id === 'dot')!
-    : presetScenarios().find(s => s.id === 'vuln_elite')!;
-  const conds = scenario.conditions;
-  const additive = additiveForScenario(build, conds);
+  // Use the same scenario state as the Damage card so user can experiment from one place.
+  const conds = { ...scenarioState };
+  const scenario: any = build.disableCrit ? presetScenarios().find(s => s.id === 'dot') : { id: 'live', label: 'crit hit', conditions: conds };
+  const isDot = !!scenario.isDot;
+  const additive = additiveForScenario(build, isDot ? {} : conds);
   const critAdd = critOnlyAdditive(build);
-  const vdmFactor = conds.vulnerable ? c.vdm * 1.2 : 1;
-
-  // Match scenarioDamage() exactly
+  const vdmFactor = conds.vulnerable && !isDot ? c.vdm * 1.2 : 1;
   const base = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * build.enemyDR;
   const nonCritDmg = base * (1 + additive);
   const critDmg = base * (1 + additive + critAdd) * c.csdm * 1.5;
-  const avgDmg = scenario.isDot
-    ? base * (1 + additive) * c.dotm
-    : critDmg * c.critChance + nonCritDmg * (1 - c.critChance);
+  const dotDmg = base * (1 + additive) * c.dotm;
+  const avgDmg = isDot ? dotDmg : (critDmg * c.critChance + nonCritDmg * (1 - c.critChance));
 
-  const num = (n: number, d=2) => n.toLocaleString('en-US', { maximumFractionDigits: d });
-  const fmtMult = (n: number) => `×${num(n, 3)}`;
-  const fmtAdd = (n: number) => `+${(n * 100).toFixed(1)}%`;
+  const dec = (n: number, d=3) => n.toLocaleString('en-US', { maximumFractionDigits: d });
+  const hi = (s: string) => `<span class="text-amber-400 font-mono">${s}</span>`;
 
-  wrap.append(el('p', { class: 'text-xs text-zinc-500 mb-3' },
-    `Scenario: “${scenario.label}” · ${conds.vulnerable ? 'enemy is vulnerable, ' : ''}${conds.elites ? 'enemy is elite, ' : ''}${scenario.isDot ? 'DoT tick' : `${(c.critChance*100).toFixed(0)}% crit chance`}.`,
-  ));
+  // One table: Symbol | Description | Your value (decimal). All in decimals.
+  const tbl = el('table', { class: 'w-full text-xs my-3' });
+  tbl.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
+    el('th', { class: 'text-left py-1 font-normal w-12' }, ''),
+    el('th', { class: 'text-left py-1 font-normal' }, 'Variable'),
+    el('th', { class: 'text-right py-1 font-normal' }, 'Your value'),
+  )));
+  type Row = [string, string, string];
+  const rows: Row[] = [
+    ['W',         'weapon damage',                                    dec(c.weaponDmg, 0)],
+    ['A',         'additive damage bucket (1 + sum)',                  dec(1 + additive)],
+    ['S',         `${cls.mainStat} multiplier (1 + S/${cls.divisor})`, dec(c.mainStatMult)],
+    ['C',         'skill damage (decimal)',                            dec(c.skillCoef)],
+    ['M_{all}',   'All / Element Damage bucket',                       dec(c.allm)],
+  ];
+  if (!isDot) {
+    rows.push(['M_{crit}', 'Crit Damage Mult × 1.5 inherent', dec(c.csdm * 1.5)]);
+    if (conds.vulnerable) rows.push(['M_{vuln}', 'Vuln Damage Mult × 1.2 inherent', dec(vdmFactor)]);
+  } else {
+    rows.push(['M_{dot}', 'Damage Over Time bucket', dec(c.dotm)]);
+  }
+  rows.push(['∏M_i', 'standalone aspects/uniques product', dec(c.extraMultProduct)]);
+  rows.push(['1-R',     'enemy DR factor (training dummy = 0.20)', dec(1 - build.enemyDR, 2)]);
 
-  const tbl = el('table', { class: 'w-full text-xs' });
-  const addRow = (label: string, value: string, hl?: boolean) =>
-    tbl.append(el('tr', { class: 'border-b border-zinc-900' },
-      el('td', { class: 'py-1 pr-3 ' + (hl ? 'text-amber-400 font-semibold' : 'text-zinc-400') }, label),
-      el('td', { class: 'py-1 text-right tabular-nums font-mono ' + (hl ? 'text-amber-400 font-semibold' : 'text-zinc-300') }, value),
+  const tb = el('tbody');
+  for (const [sym, desc, val] of rows) {
+    tb.append(el('tr', { class: 'border-b border-zinc-900 align-top' },
+      el('td', { class: 'py-1 pr-3 w-12' }, katexInline(sym)),
+      el('td', { class: 'py-1 text-zinc-400' }, desc),
+      el('td', { class: 'py-1 text-right font-mono text-amber-400 tabular-nums' }, val),
     ));
-
-  addRow('Weapon Damage', num(c.weaponDmg));
-  addRow(`${cls.mainStat} multiplier`, `${c.mainStatSum} → (1 + ${c.mainStatSum}/${cls.divisor}) = ${fmtMult(c.mainStatMult)}`);
-  // Break down the additive bucket so user can see what's in it for this scenario
-  const addParts: string[] = [];
-  for (const l of build.additiveLines) {
-    if (l.isCritOnly) continue;
-    if (l.applies(conds) && l.value > 0) addParts.push(`${l.label}: ${fmtAdd(l.value).slice(1)}`);
   }
-  // ADDITIVE-bucket affixes from any slot
-  let slotAddSum = 0;
-  for (const slot of build.slots) for (const aa of slot.affixes) if (aa.bucket === 'ADDITIVE') slotAddSum += aa.value;
-  if (slotAddSum > 0) addParts.push(`gear/extra ADDITIVE affixes: ${(slotAddSum*100).toFixed(1)}%`);
-  const addBreakdown = addParts.length ? ` — includes ${addParts.join(', ')}` : '';
-  addRow('Additive bucket (always-on + scenario-conditional)', `${fmtAdd(additive)} → ${fmtMult(1 + additive)}${addBreakdown}`);
-  if (!scenario.isDot && critAdd > 0) {
-    addRow('Crit-only additive bonus', `${fmtAdd(critAdd)} (added on crit)`);
-  }
-  addRow('All / Element Damage Mult', `${fmtAdd(c.allm - 1)} → ${fmtMult(c.allm)}`);
-  if (conds.vulnerable) {
-    addRow('Vulnerable Damage Mult', `${fmtAdd(c.vdm - 1)} bucket × 1.20 (inherent vuln) = ${fmtMult(vdmFactor)}`);
-  } else {
-    addRow('Vulnerable Damage Mult', 'inactive (target not vulnerable)');
-  }
-  if (scenario.isDot) {
-    addRow('Damage Over Time Mult', `${fmtAdd(c.dotm - 1)} → ${fmtMult(c.dotm)}`);
-  } else {
-    addRow('Crit Damage Mult', `${fmtAdd(c.csdm - 1)} bucket × 1.5 (inherent crit) = ${fmtMult(c.csdm * 1.5)} (on crit only)`);
-  }
-  addRow('Skill damage %', `${(c.skillCoef * 100).toFixed(1)}% (${c.totalSkillRanks} ranks)`);
-  if (c.extraMultProduct !== 1) {
-    addRow('Standalone mults product', fmtMult(c.extraMultProduct));
-  }
-  addRow('Enemy DR (training dummy)', `${num(build.enemyDR, 2)} (${num((1 - build.enemyDR) * 100, 0)}% reduction)`);
-  if (!scenario.isDot) {
-    addRow('Non-crit hit', num(nonCritDmg, 0));
-    addRow('Crit hit', num(critDmg, 0));
-    addRow('Average (weighted by crit chance)', `${(c.critChance * 100).toFixed(1)}% crit + ${((1 - c.critChance) * 100).toFixed(1)}% non-crit`);
-  }
+  tbl.append(tb);
   wrap.append(tbl);
 
-  wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
-    el('span', { class: 'text-sm text-zinc-300' }, scenario.isDot ? 'DoT tick damage' : 'Average damage per hit'),
-    el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(avgDmg)),
-  ));
-
-  // KaTeX rendered formula with substituted values — use Avg form (so it matches the readout above)
-  // Avg = nonCritDmg * (1 - cc) + critDmg * cc
-  // We show the crit branch since that's what 'Crit hit' is, then explain weighting.
-  const ms = (1 + c.mainStatSum / cls.divisor).toFixed(3);
-  if (scenario.isDot) {
-    const tex = String.raw`\text{DoT} = ${num(c.weaponDmg)} \cdot (1 + ${num(additive,3)}) \cdot ${ms} \cdot ${num(c.skillCoef,4)} \cdot ${num(c.extraMultProduct,3)} \cdot ${num(c.allm,3)} \cdot ${num(c.dotm,3)} \cdot ${num(build.enemyDR,2)}`;
-    wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(tex)));
+  // Equation with substituted decimals
+  let eq: string;
+  if (isDot) {
+    eq = String.raw`D = ${dec(c.weaponDmg, 0)} \cdot ${dec(1 + additive)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.allm)} \cdot ${dec(c.dotm)} \cdot ${dec(c.extraMultProduct)} \cdot ${dec(1 - build.enemyDR, 2)} = ${dec(dotDmg, 0)}`;
   } else {
-    // Non-crit branch
-    let texNoncrit = String.raw`\text{non-crit} = ${num(c.weaponDmg)} \cdot (1 + ${num(additive,3)}) \cdot ${ms} \cdot ${num(c.skillCoef,4)} \cdot ${num(c.extraMultProduct,3)} \cdot ${num(c.allm,3)}`;
-    if (conds.vulnerable) texNoncrit += String.raw` \cdot (${num(c.vdm,3)} \cdot 1.2)`;
-    texNoncrit += String.raw` \cdot ${num(build.enemyDR,2)}`;
-    wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(texNoncrit)));
-
-    // Crit branch (includes critAdd inside the additive)
-    let texCrit = String.raw`\text{crit} = ${num(c.weaponDmg)} \cdot (1 + ${num(additive,3)} + ${num(critAdd,3)}) \cdot ${ms} \cdot ${num(c.skillCoef,4)} \cdot ${num(c.extraMultProduct,3)} \cdot ${num(c.allm,3)}`;
-    if (conds.vulnerable) texCrit += String.raw` \cdot (${num(c.vdm,3)} \cdot 1.2)`;
-    texCrit += String.raw` \cdot (${num(c.csdm,3)} \cdot 1.5) \cdot ${num(build.enemyDR,2)}`;
-    wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(texCrit)));
-
-    wrap.append(el('div', { class: 'mt-2 overflow-x-auto text-xs' }, katexBlock(
-      String.raw`\text{avg} = ${num(c.critChance,3)} \cdot \text{crit} + ${num(1-c.critChance,3)} \cdot \text{non-crit} = ${num(avgDmg, 0)}`,
-    )));
+    const vdmPart = conds.vulnerable ? String.raw` \cdot ${dec(vdmFactor)}` : '';
+    eq = String.raw`D_{crit} = ${dec(c.weaponDmg, 0)} \cdot ${dec(1 + additive + critAdd)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.allm)} \cdot ${dec(c.csdm * 1.5)}${vdmPart} \cdot ${dec(c.extraMultProduct)} \cdot ${dec(1 - build.enemyDR, 2)} = ${dec(critDmg, 0)}`;
   }
+  wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(eq)));
 
+  // Big result
+  wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
+    el('span', { class: 'text-sm text-zinc-300' }, isDot ? 'DoT tick' : `Crit hit damage`),
+    el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(isDot ? dotDmg : critDmg)),
+  ));
+  if (!isDot) {
+    wrap.append(el('div', { class: 'text-xs text-zinc-500 mt-2' }, `Avg (with ${(c.critChance*100).toFixed(0)}% crit chance) = ${fmtBigNum(avgDmg)}`));
+  }
+  void hi; // unused helper
   return wrap;
 }
 

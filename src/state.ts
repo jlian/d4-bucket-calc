@@ -55,6 +55,8 @@ function validNumber(n: any, fallback = 0): number {
   return isFinite(x) ? x : fallback;
 }
 
+// validStringList: kept for future use; currently unused after dropping extraMultipliers/extraAdditive
+// @ts-ignore unused
 function validStringList(arr: any, fields: string[]): any[] {
   if (!Array.isArray(arr)) return [];
   return arr.filter(it => it && typeof it === 'object' && fields.every(f => f in it));
@@ -71,29 +73,7 @@ function reconcileWeaponClass(slots: import('./calc').Slot[], classId: string): 
 }
 
 function migrateSlotsAndExtras(j: any): import('./calc').Slot[] {
-  const slots = migrateSlots(j.slots);
-  // Migrate legacy extraMultipliers -> EXTRAMULT affixes on the paragon slot
-  const extraMults = validStringList(j.extraMultipliers, ['label', 'value']).map((m: any) => ({
-    bucket: 'EXTRAMULT' as const, value: validNumber(m.value, 0), label: String(m.label ?? ''),
-  }));
-  const extraAdds = validStringList(j.extraAdditive, ['label', 'value']).map((m: any) => ({
-    bucket: 'ADDITIVE' as const, value: validNumber(m.value, 0), label: String(m.label ?? ''),
-  }));
-  if (extraMults.length || extraAdds.length) {
-    const para = slots.find(s => s.id === 'paragon');
-    if (para) para.affixes.push(...extraMults, ...extraAdds);
-  }
-  // Legacy charmU -> charm1
-  const legacyU = (j.slots || []).find((s: any) => s && s.id === 'charmU');
-  if (legacyU && Array.isArray(legacyU.affixes)) {
-    const charm1 = slots.find(s => s.id === 'charm1');
-    if (charm1 && charm1.affixes.length === 0) {
-      const aff = legacyU.affixes.filter((a: any) => a && typeof a.bucket === 'string')
-        .map((a: any) => ({ bucket: a.bucket, value: validNumber(a.value, 0), ...(typeof a.label === 'string' ? { label: a.label } : {}) }));
-      charm1.affixes = aff;
-    }
-  }
-  return slots;
+  return migrateSlots(j.slots);
 }
 
 function serialToBuild(j: any): Build {
