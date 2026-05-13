@@ -172,8 +172,8 @@ function classSkillCard() {
   grid.append(field('Class', classSel));
 
   grid.append(field('Skill name', textInput(() => build.skillName, v => build.skillName = v, { w: 'w-full', placeholder: 'e.g. Holy Bolt' })));
-  grid.append(field('Skill damage % (in-game tooltip, e.g. 403)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
-  grid.append(field('Skill Ranks (naked, no gear/charms)', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
+  grid.append(field('Skill Damage % at rank 1 (e.g. 115 for Blessed Hammer)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
+  grid.append(field('Skill Ranks (naked, usually 15)', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
   grid.append(field(`${cls.mainStat} (naked, no gear/charms)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
   grid.append(field(`Bonus ${cls.mainStat} (charms / seal / talisman)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
 
@@ -440,7 +440,7 @@ function bucketsCard() {
     { affix: `x10% ${cls.mainStat} Multiplier`,        gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) },
     { affix: '+10% Critical Strike Chance',            gain: weightFor(build, 'CRITCHANCE', 0.10, refScenario), warn: c.critChance >= 1 ? 'capped' : undefined },
     { affix: '+196 Weapon Damage',                     gain: weightFor(build, 'WEPDMG', 196, refScenario) },
-    { affix: '+5 Skill Ranks',                         gain: weightFor(build, 'SKILLRANK', 5, refScenario) },
+    { affix: '+3 Skill Ranks',                         gain: weightFor(build, 'SKILLRANK', 3, refScenario) },
   ];
   rows.sort((a, b) => b.gain - a.gain);
 
@@ -562,29 +562,29 @@ function buildPluggedIn(): HTMLElement {
   const dec = (n: number, d=3) => n.toLocaleString('en-US', { maximumFractionDigits: d });
   const hi = (s: string) => `<span class="text-amber-400 font-mono">${s}</span>`;
 
-  // One table: Symbol | Description | Your value (decimal). All in decimals.
+  // One table: Symbol matches the formula exactly | Description | Your value with the math
   const tbl = el('table', { class: 'w-full text-xs my-3' });
   tbl.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
-    el('th', { class: 'text-left py-1 font-normal w-12' }, ''),
-    el('th', { class: 'text-left py-1 font-normal' }, 'Variable'),
+    el('th', { class: 'text-left py-1 font-normal w-24' }, 'Factor'),
+    el('th', { class: 'text-left py-1 font-normal' }, 'Description'),
     el('th', { class: 'text-right py-1 font-normal' }, 'Your value'),
   )));
   type Row = [string, string, string];
   const rows: Row[] = [
-    ['W',         'weapon damage',                                    dec(c.weaponDmg, 0)],
-    ['A',         'additive damage bucket (1 + sum)',                  dec(1 + additive)],
-    ['S',         `${cls.mainStat} multiplier (1 + S/${cls.divisor})`, dec(c.mainStatMult)],
-    ['C',         'skill damage (decimal)',                            dec(c.skillCoef)],
-    ['M_{all}',   'All / Element Damage bucket',                       dec(c.allm)],
+    ['W',                       'avg weapon damage',                                                          dec(c.weaponDmg, 0)],
+    ['(1 + A)',                 `additive bucket (A = sum of all +% damage = ${dec(additive)})`,              `${dec(1 + additive)}`],
+    [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier (S = ${dec(c.mainStatSum, 0)})`,                 `${dec(c.mainStatMult)}`],
+    ['C',                       `skill damage % (rank-1 ${dec(build.skillDamagePct)} × step formula at ${c.totalSkillRanks} ranks)`, dec(c.skillCoef)],
+    ['M_{all}',                 'All / Element Damage Mult bucket (1 + sum)',                                  dec(c.allm)],
   ];
   if (!isDot) {
-    rows.push(['M_{crit}', 'Crit Damage Mult × 1.5 inherent', dec(c.csdm * 1.5)]);
-    if (conds.vulnerable) rows.push(['M_{vuln}', 'Vuln Damage Mult × 1.2 inherent', dec(vdmFactor)]);
+    rows.push(['M_{crit} \cdot 1.5', `Crit Damage Mult bucket (= ${dec(c.csdm)}) × 1.5 inherent`, dec(c.csdm * 1.5)]);
+    if (conds.vulnerable) rows.push(['M_{vuln} \cdot 1.2', `Vuln Damage Mult bucket (= ${dec(c.vdm)}) × 1.2 inherent`, dec(vdmFactor)]);
   } else {
-    rows.push(['M_{dot}', 'Damage Over Time bucket', dec(c.dotm)]);
+    rows.push(['M_{dot}', 'Damage Over Time Mult bucket', dec(c.dotm)]);
   }
-  rows.push(['∏M_i', 'standalone aspects/uniques product', dec(c.extraMultProduct)]);
-  rows.push(['1-R',     'enemy DR factor (training dummy = 0.20)', dec(1 - build.enemyDR, 2)]);
+  rows.push(['\prod M_i', `product of standalone aspects/uniques`,                            dec(c.extraMultProduct)]);
+  rows.push(['(1 - R)',  `enemy DR factor (R = ${dec(build.enemyDR, 2)} for level-appropriate enemy)`, dec(1 - build.enemyDR, 2)]);
 
   const tb = el('tbody');
   for (const [sym, desc, val] of rows) {

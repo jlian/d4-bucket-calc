@@ -244,12 +244,15 @@ export function calc(b: Build): Calc {
   if (b.disableCrit) critChance = 0;
   critChance = Math.max(0, Math.min(1, critChance));
 
-  // Skill ranks: user enters totalSkillRanks directly; gear SKILLRANK affixes add on top.
-  // Skill damage % is taken AS-IS from the in-game tooltip (already includes rank scaling).
+  // Skill coefficient: take the rank-1 base value AS-IS, scale by total ranks via the spreadsheet's step formula.
+  // Total ranks = naked ranks (totalSkillRanks) + ranks from gear/charm SKILLRANK affixes.
   const totalSkillRanks = b.totalSkillRanks + sumAffixes(b.slots, 'SKILLRANK');
-  // Each +1 skill rank ≈ +10% to skill damage % (rough heuristic for the "+5 Skill Ranks" affix preview).
-  // We anchor at the user's current skillDamagePct + their current totalSkillRanks.
-  const skillCoef = b.skillDamagePct * (1 + 0.10 * sumAffixes(b.slots, 'SKILLRANK'));
+  let skillCoef = b.skillDamagePct;
+  if (totalSkillRanks > 0) {
+    const N = totalSkillRanks, f = Math.floor(N / 5);
+    // base × (1 + 0.10·(N - floor(N/5) - 1) + 0.15·floor(N/5))
+    skillCoef = b.skillDamagePct * (1 + 0.10 * (N - f - 1) + 0.15 * f);
+  }
 
   const csdm = 1 + sumAffixes(b.slots, 'CSDM');
   const vdm  = 1 + sumAffixes(b.slots, 'VDM');
