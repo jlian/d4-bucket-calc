@@ -8,7 +8,7 @@ import {
   WEAPON_TYPES,
   type Build, type Bucket, type Slot,
 } from './calc';
-import { loadInitialBuild, persist, exportJson, importJson, cloneBuild } from './state';
+import { loadInitialBuild, persist, exportJson, importJson, cloneBuild, buildShareUrl } from './state';
 
 let build: Build = loadInitialBuild();
 
@@ -144,7 +144,7 @@ function renderHeader() {
         ),
       ),
       el('div', { class: 'flex items-center gap-2 flex-wrap' },
-        snapshotBtn(), importBtn(), exportBtn(), copyShareBtn(), resetBtn(),
+        snapshotBtn(), restoreSnapshotBtn(), jsonBtn(), copyShareBtn(), resetBtn(),
       ),
     ),
   );
@@ -721,9 +721,11 @@ function katexBlock(tex: string): HTMLElement {
 
 // ---------- header buttons ----------
 function copyShareBtn() {
-  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-zinc-950 font-medium' }, 'Copy Share Link');
+  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-zinc-950 font-medium', title: 'Copy a shareable link that encodes the current build' }, 'Copy Share Link');
   btn.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(window.location.href);
+    const url = buildShareUrl(build);
+    try { await navigator.clipboard.writeText(url); }
+    catch { prompt('Copy this link:', url); }
     const old = btn.textContent;
     btn.textContent = 'Copied!';
     setTimeout(() => { btn.textContent = old; }, 1500);
@@ -733,40 +735,94 @@ function copyShareBtn() {
 
 function snapshotBtn() {
   if (build.snapshot) {
-    const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-100' }, '📌 Clear Snapshot');
-    btn.addEventListener('click', () => { build.snapshot = null; mount(); });
+    const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-100', title: 'Stop comparing against the snapshot (does not change current build)' }, '📌 Clear Snapshot');
+    btn.addEventListener('click', () => { build.snapshot = null; persist(build); mount(); });
     return btn;
   }
   const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Freeze current build to compare against future changes' }, '📌 Snapshot');
   btn.addEventListener('click', () => {
     const snap = cloneBuild(build); snap.snapshot = null;
     build.snapshot = snap;
+    persist(build);
     mount();
   });
   return btn;
 }
 
-function exportBtn() {
-  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300' }, 'Export JSON');
-  btn.addEventListener('click', async () => {
-    const json = exportJson(build);
-    try { await navigator.clipboard.writeText(json); btn.textContent = 'JSON Copied!'; setTimeout(() => { btn.textContent = 'Export JSON'; }, 1500); }
-    catch { prompt('Copy this JSON:', json); }
-  });
-  return btn;
-}
-
-function importBtn() {
-  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300' }, 'Import JSON');
+function restoreSnapshotBtn() {
+  if (!build.snapshot) return el('span', { class: 'hidden' });
+  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Revert current build to the snapshot state' }, '↩ Restore');
   btn.addEventListener('click', () => {
-    const text = prompt('Paste build JSON:');
-    if (!text) return;
-    const parsed = importJson(text);
-    if (!parsed) { alert('Invalid JSON'); return; }
-    build = parsed;
+    if (!build.snapshot) return;
+    if (!confirm('Revert current build to the snapshot? Unsnapshot edits will be lost.')) return;
+    const restored = cloneBuild(build.snapshot);
+    restored.snapshot = null;
+    build = restored;
+    persist(build);
     mount();
   });
   return btn;
+}
+
+function jsonBtn() {
+  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'View / edit / copy build JSON' }, '{ } JSON');
+  btn.addEventListener('click', () => openJsonDialog());
+  return btn;
+}
+
+function openJsonDialog() {
+  const overlay = el('div', { class: 'fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4' });
+  const panel = el('div', { class: 'bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col' });
+
+  const header = el('div', { class: 'flex items-center justify-between px-4 py-3 border-b border-zinc-800' },
+    el('h3', { class: 'text-sm font-medium text-zinc-200' }, 'Build JSON'),
+    Object.assign(el('button', { class: 'text-zinc-500 hover:text-zinc-200 text-lg leading-none', 'aria-label': 'Close' }), { textContent: '✕' }),
+  );
+  (header.lastChild as HTMLElement).addEventListener('click', () => overlay.remove());
+
+  const ta = el('textarea', {
+    class: 'flex-1 min-h-[300px] w-full bg-zinc-950 text-zinc-200 text-xs font-mono p-3 rounded border border-zinc-800 focus:outline-none focus:border-amber-600 resize-none',
+    spellcheck: 'false',
+  }) as HTMLTextAreaElement;
+  ta.value = exportJson(build);
+
+  const status = el('span', { class: 'text-xs text-zinc-500' }, '');
+
+  const copyBtn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300' }, 'Copy');
+  copyBtn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(ta.value); status.textContent = 'Copied to clipboard'; status.className = 'text-xs text-emerald-400'; }
+    catch { status.textContent = 'Copy failed — select & copy manually'; status.className = 'text-xs text-red-400'; }
+  });
+
+  const applyBtn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-zinc-950 font-medium' }, 'Apply');
+  applyBtn.addEventListener('click', () => {
+    const parsed = importJson(ta.value);
+    if (!parsed) { status.textContent = 'Invalid JSON — not applied'; status.className = 'text-xs text-red-400'; return; }
+    build = parsed;
+    persist(build);
+    mount();
+    overlay.remove();
+  });
+
+  const cancelBtn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300' }, 'Close');
+  cancelBtn.addEventListener('click', () => overlay.remove());
+
+  const body = el('div', { class: 'flex-1 flex flex-col min-h-0 p-4 gap-3' });
+  body.append(
+    el('p', { class: 'text-xs text-zinc-500' }, 'Edit the JSON and click Apply to load it. Copy to share or back up.'),
+    ta,
+    el('div', { class: 'flex items-center justify-between gap-2 flex-wrap' },
+      status,
+      el('div', { class: 'flex gap-2' }, copyBtn, applyBtn, cancelBtn),
+    ),
+  );
+
+  panel.append(header, body);
+  overlay.append(panel);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+  // Focus textarea so the user can immediately edit / select-all.
+  setTimeout(() => ta.focus(), 0);
 }
 
 function resetBtn() {

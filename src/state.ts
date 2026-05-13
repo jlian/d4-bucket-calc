@@ -151,7 +151,13 @@ export function loadInitialBuild(): Build {
   const hash = window.location.hash.replace(/^#/, '');
   if (hash) {
     const b = decodeHash(hash);
-    if (b) return b;
+    if (b) {
+      // Clear the long hash from the address bar once consumed; the user's
+      // edits live in localStorage and a fresh share link is regenerated
+      // on demand from "Copy Share Link".
+      try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch {}
+      return b;
+    }
   }
   return loadLocal() ?? defaultBuild();
 }
@@ -162,8 +168,15 @@ export function cloneBuild(b: Build): Build {
   return { ...b, additiveLines: b.additiveLines.map(l => ({ ...l })), slots: structuredClone(b.slots), snapshot: b.snapshot ? cloneBuild(b.snapshot) : null };
 }
 
+// Persist to localStorage only. The URL hash is intentionally NOT updated on
+// every edit — it would balloon the address bar. Use buildShareUrl() for
+// the explicit "Copy Share Link" flow.
 export function persist(b: Build) {
   saveLocal(b);
+}
+
+export function buildShareUrl(b: Build): string {
   const h = encodeHash(b);
-  history.replaceState(null, '', '#' + h);
+  const base = window.location.origin + window.location.pathname + window.location.search;
+  return base + '#' + h;
 }
