@@ -215,27 +215,6 @@ function nakedBaselineCard() {
     grid.append(row);
   }
   card.append(grid);
-
-  // Custom additive entries (free-form): for things not in the standard list (paragon legendary additive nodes, set bonuses listed as additive, etc.)
-  card.append(el('h4', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-4 mb-2' }, 'Custom additive (always-on)'));
-  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'Free-form additive entries that go into the additive bucket. Useful for paragon legendary nodes that grant additive damage, set bonuses with +X% damage, etc.'));
-  const paragonSlot = build.slots.find(s => s.id === 'paragon');
-  if (paragonSlot) {
-    const customAdds = paragonSlot.affixes.filter(a => a.bucket === 'ADDITIVE');
-    customAdds.forEach((a) => {
-      const row = el('div', { class: 'flex items-center gap-2 mb-1.5' });
-      row.append(textInput(() => a.label ?? '', v => { a.label = v; }, { w: 'flex-1', placeholder: 'Label (e.g. “Extra paragon damage”)' }));
-      row.append(pctInput(() => a.value, v => a.value = v, { w: 'w-24' }));
-      row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
-      const del = el('button', { class: 'text-zinc-500 hover:text-red-400 px-2' }, '✕');
-      del.addEventListener('click', () => { paragonSlot.affixes.splice(paragonSlot.affixes.indexOf(a), 1); mount(); });
-      row.append(del);
-      card.append(row);
-    });
-    const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-1 rounded border border-amber-700/50 mt-1' }, '+ Add custom additive');
-    addBtn.addEventListener('click', () => { paragonSlot.affixes.push({ bucket: 'ADDITIVE' as Bucket, value: 0, label: '' }); mount(); });
-    card.append(addBtn);
-  }
   return card;
 }
 
