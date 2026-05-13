@@ -229,7 +229,7 @@ function slotsCard() {
 
 function paragonContributionsCard() {
   const card = sectionCard('Non-gear Contributions (Paragon / Glyphs / Charms / Seal)',
-    'For affixes that go into named buckets (CSDM, VDM, etc.) but don’t come from equipped gear: paragon glyph legendary mults, charm/seal [×] mults, etc. Pure additive paragon damage is already counted via the in-game Offensive tab “from items and Paragon” numbers above.');
+    'For affixes that go into named buckets (Critical Strike Damage Mult, Vulnerable Damage Mult, etc.) but don’t come from equipped gear: paragon glyph legendary mults, charm/seal x% mults, etc. Pure additive paragon damage is already counted via the in-game Offensive tab “from items and Paragon” numbers above.');
   const slot = build.slots.find(s => s.id === 'paragon');
   if (slot) card.append(slotBlock(slot));
   return card;
@@ -544,9 +544,9 @@ function formulaCard() {
     katexInline('\\Delta / B'), ', where ', katexInline('B'), ' is the bucket\'s current value — smaller buckets give bigger gains.',
   ));
 
-  // Main formula
+  // Main formula — use plain symbols, not in-build jargon
   const divisor = classFor(build).divisor;
-  const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (\text{CSDM} \cdot 1.5)^{c} \cdot (\text{VDM} \cdot 1.2)^{v} \cdot \text{DOTM}^{d} \cdot (1 - R)`;
+  const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (M_{crit} \cdot 1.5)^{c} \cdot (M_{vuln} \cdot 1.2)^{v} \cdot M_{dot}^{d} \cdot M_{all} \cdot (1 - R)`;
   card.append(el('div', { class: 'my-4 flex justify-center overflow-x-auto' }, katexBlock(formula)));
 
   // Worked example with the user's current build values
@@ -560,9 +560,10 @@ function formulaCard() {
     ['S', `Total main stat (Strength/Dexterity/Intelligence/Willpower); divisor is ${divisor} for ${build.classId}`],
     ['C', 'Skill damage % at your current rank (taken as-is from the in-game advanced tooltip)'],
     ['M_i', 'Each standalone [x] aspect/unique multiplier (Grandfather, Godslayer, glyph legendary mults, etc.)'],
-    ['CSDM', 'Critical Strike Damage Multiplier bucket: 1 + sum of all "[x] X% Critical Strike Damage Multiplier" affixes'],
-    ['VDM', 'Vulnerable Damage Multiplier bucket: 1 + sum of all "[x] X% Vulnerable Damage Multiplier" affixes'],
-    ['DOTM', 'Damage over Time Multiplier bucket: 1 + sum of all "[x] X% Damage over Time Multiplier" affixes'],
+    ['M_{crit}', 'Critical Strike Damage Mult bucket: 1 + sum of all “x% Critical Strike Damage Multiplier” affixes'],
+    ['M_{vuln}', 'Vulnerable Damage Mult bucket: 1 + sum of all “x% Vulnerable Damage Multiplier” affixes'],
+    ['M_{dot}', 'Damage Over Time Mult bucket: 1 + sum of all “x% Damage Over Time Multiplier” affixes'],
+    ['M_{all}', 'All / Element Damage Mult bucket: 1 + sum of all “x% All Damage / Elemental / Physical Multiplier” affixes'],
     ['R', 'Enemy damage reduction; level-appropriate enemy = 80% (so factor is 0.20)'],
     ['c, v, d', 'Indicator variables (1 if the hit crits / target is vulnerable / hit is DoT, else 0)'],
   ];
