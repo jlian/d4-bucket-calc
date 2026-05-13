@@ -537,6 +537,18 @@ function formulaCard() {
   return card;
 }
 
+function additiveBreakdown(b: Build, conds: any): string {
+  const parts: string[] = [];
+  for (const l of b.additiveLines) {
+    if (l.isCritOnly) continue;
+    if (l.applies(conds) && l.value > 0) parts.push(`${l.label} ${(l.value*100).toFixed(0)}%`);
+  }
+  let slotAdd = 0;
+  for (const slot of b.slots) for (const aa of slot.affixes) if (aa.bucket === 'ADDITIVE') slotAdd += aa.value;
+  if (slotAdd > 0) parts.push(`gear/extras ${(slotAdd*100).toFixed(1)}%`);
+  return parts.length ? ` — sum of ${parts.join(', ')}` : '';
+}
+
 function buildPluggedIn(): HTMLElement {
   const wrap = el('div', { class: 'my-4 bg-zinc-950 border border-zinc-800 rounded p-4' });
   wrap.append(el('h3', { class: 'text-sm font-semibold text-amber-400 mb-3' }, '✨ Your build, plugged in'));
@@ -575,16 +587,16 @@ function buildPluggedIn(): HTMLElement {
   // Order matches the formula left-to-right
   const rows: Row[] = [
     ['W',                       'avg weapon damage',                                                  '',                                            c.weaponDmg],
-    ['(1 + A)',                 'always-on additive damage bucket',                                  `1 + ${dec(additive)}`,                        1 + additive],
+    ['(1 + A)',                 `always-on additive damage bucket${additiveBreakdown(build, conds)}`,                                  `1 + ${dec(additive)}`,                        1 + additive],
     [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier`,                                        `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
     ['C',                       `skill damage % at ${c.totalSkillRanks} ranks (rank-1 × step formula)`, `${dec(build.skillDamagePct)} × ${dec(c.skillCoef / Math.max(build.skillDamagePct, 1e-9))}`, c.skillCoef],
-    ['\prod_i M_i',             'product of standalone aspects/uniques',                            '',                                            c.extraMultProduct],
+    [String.raw`\prod_i M_i`,    'product of standalone aspects/uniques',                            '',                                            c.extraMultProduct],
   ];
   if (!isDot) {
-    rows.push(['(1.5 \cdot M_{crit})^c', `crit factor (c=1 if hit crits, else 0). Bucket sum = ${dec(c.csdm)}`, `1.5 × ${dec(c.csdm)}`, c.csdm * 1.5]);
-    rows.push(['(1.2 \cdot M_{vuln})^v', `vulnerable factor (v=1 if target is vulnerable, else 0). Bucket sum = ${dec(c.vdm)}`, conds.vulnerable ? `1.2 × ${dec(c.vdm)}` : 'inactive', vdmFactor]);
+    rows.push([String.raw`(1.5 \cdot M_{crit})^c`, `crit factor (c=1 if hit crits, else 0). Bucket sum = ${dec(c.csdm)}. ${critAdd > 0 ? `On crit, +${(critAdd*100).toFixed(0)}% extra additive (CRITADD).` : ''}`, `1.5 × ${dec(c.csdm)}`, c.csdm * 1.5]);
+    rows.push([String.raw`(1.2 \cdot M_{vuln})^v`, `vulnerable factor (v=1 if target is vulnerable, else 0). Bucket sum = ${dec(c.vdm)}`, conds.vulnerable ? `1.2 × ${dec(c.vdm)}` : 'inactive (v = 0)', vdmFactor]);
   } else {
-    rows.push(['M_{dot}^d', 'damage over time factor (d=1 for DoT ticks)', '', c.dotm]);
+    rows.push([String.raw`M_{dot}^d`, 'damage over time factor (d=1 for DoT ticks)', '', c.dotm]);
   }
   rows.push(['M_{all}',          'All / Element Damage Mult bucket', `1 + ${dec(c.allm - 1)}`, c.allm]);
   rows.push(['(1 - R)',          `enemy damage reduction (R = ${dec(build.enemyDR, 2)} for level-appropriate enemy)`, `1 - ${dec(build.enemyDR, 2)}`, 1 - build.enemyDR]);
