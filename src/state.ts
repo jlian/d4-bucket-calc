@@ -43,12 +43,9 @@ function migrateSlots(slotsIn: any): import('./calc').Slot[] {
           return knownWeaponIds.has(normalized) ? normalized : 'none';
         })()
       : undefined;
-    const weaponAvgDamage = isWeapon && typeof found.weaponAvgDamage === 'number' && found.weaponAvgDamage > 0
-      ? found.weaponAvgDamage
-      : undefined;
     return {
       id: def.id, name: def.name, affixes,
-      ...(isWeapon ? { weaponTypeId, ...(weaponAvgDamage ? { weaponAvgDamage } : {}) } : {}),
+      ...(isWeapon ? { weaponTypeId } : {}),
     };
   });
 }

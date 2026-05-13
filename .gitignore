@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 .review-context-*.txt
 test.json
+tmp/*

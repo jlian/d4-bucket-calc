@@ -96,6 +96,8 @@ function mount() {
   left.append(classSkillCard());
   left.append(nakedBaselineCard());
   left.append(slotsCard());
+  left.append(charmsCard());
+  left.append(glyphsCard());
   left.append(paragonContributionsCard());
   left.append(extraAdditiveCard());
   left.append(extraMultsCard());
@@ -173,7 +175,7 @@ function classSkillCard() {
 
   grid.append(field('Skill name', textInput(() => build.skillName, v => build.skillName = v, { w: 'w-full', placeholder: 'e.g. Holy Bolt' })));
   grid.append(field('Skill damage % (in-game tooltip, e.g. 403)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
-  grid.append(field('Total Skill Ranks', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
+  grid.append(field('Skill Ranks (naked, no gear/charms)', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
   grid.append(field(`${cls.mainStat} (naked, no gear/charms)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
   grid.append(field(`Bonus ${cls.mainStat} (charms / seal / talisman)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
 
@@ -213,13 +215,18 @@ function nakedBaselineCard() {
 }
 
 // ---------- Card 3: Gear Slots ----------
+const CHARM_IDS = new Set(['charmU', 'charm1', 'charm2', 'charm3', 'charm4', 'charm5', 'charm6', 'seal']);
+const GLYPH_IDS = new Set(['glyph1', 'glyph2', 'glyph3', 'glyph4', 'glyph5']);
+
 function slotsCard() {
   const card = sectionCard('Gear Slots',
-    'For each equipped item, pick the weapon type (weapons only) and add its affixes. The bucket weights and the worked formula example use these.');
+    'For each equipped item, pick the weapon type (weapons only) and add its affixes.');
   const cls = classFor(build);
   const weaponSlotCount = cls.weaponSlots;
   for (const slot of build.slots) {
-    if (slot.id === 'paragon') continue; // rendered separately
+    if (slot.id === 'paragon') continue;
+    if (CHARM_IDS.has(slot.id)) continue;
+    if (GLYPH_IDS.has(slot.id)) continue;
     const wepIdx = slot.id.startsWith('wep') ? parseInt(slot.id.slice(3), 10) : 0;
     if (wepIdx > 0 && wepIdx > weaponSlotCount) continue;
     card.append(slotBlock(slot));
@@ -227,9 +234,31 @@ function slotsCard() {
   return card;
 }
 
+function charmsCard() {
+  const card = sectionCard('Charms & Seal (Lord of Hatred)',
+    'Unique charm + 6 set charms + Horadric Seal. Each can carry affixes that go into damage buckets. Set bonuses (e.g., Light’s Epiphany 5pc x500%) usually go into the Standalone Multipliers card below.');
+  const order = ['charmU','charm1','charm2','charm3','charm4','charm5','charm6','seal'];
+  for (const id of order) {
+    const slot = build.slots.find(s => s.id === id);
+    if (slot) card.append(slotBlock(slot));
+  }
+  return card;
+}
+
+function glyphsCard() {
+  const card = sectionCard('Glyph Sockets (5 max)',
+    'Each glyph has up to 3 sources of damage: the additive bonus (top), additional bonus (often conditional, ignore if not steady-state), and the legendary bonus (bottom). Enter ONLY the legendary bonus here — the additive parts are already in your naked baseline numbers above.');
+  const order = ['glyph1','glyph2','glyph3','glyph4','glyph5'];
+  for (const id of order) {
+    const slot = build.slots.find(s => s.id === id);
+    if (slot) card.append(slotBlock(slot));
+  }
+  return card;
+}
+
 function paragonContributionsCard() {
-  const card = sectionCard('Non-gear Contributions (Paragon / Glyphs / Charms / Seal)',
-    'For affixes that go into named buckets (Critical Strike Damage Mult, Vulnerable Damage Mult, etc.) but don’t come from equipped gear: paragon glyph legendary mults, charm/seal x% mults, etc. Pure additive paragon damage is already counted via the in-game Offensive tab “from items and Paragon” numbers above.');
+  const card = sectionCard('Paragon Nodes (legendary, rare, magic)',
+    'For each paragon node that contributes a x% [bucket] mult or +X% damage. Add as many as you have. (Pure additive bonuses already counted via Offensive tab tooltip values above.)');
   const slot = build.slots.find(s => s.id === 'paragon');
   if (slot) card.append(slotBlock(slot));
   return card;
@@ -261,16 +290,7 @@ function slotBlock(slot: Slot) {
   header.append(addBtn);
   wrap.append(header);
 
-  // Weapon avg damage input (for non-BIS weapons)
-  if (isWeapon && slot.weaponTypeId && slot.weaponTypeId !== 'none') {
-    const wt = WEAPON_TYPES.find(w => w.id === slot.weaponTypeId);
-    if (wt && wt.baseDamage > 0) {
-      const wepRow = el('div', { class: 'flex items-center gap-2 mb-2 text-xs' });
-      wepRow.append(el('div', { class: 'text-zinc-500 flex-1' }, `Avg weapon damage (in-game tooltip; default ${wt.baseDamage} for max-rolled GA)`));
-      wepRow.append(numInput(() => slot.weaponAvgDamage ?? wt.baseDamage, v => { slot.weaponAvgDamage = v; }, { w: 'w-28' }));
-      wrap.append(wepRow);
-    }
-  }
+  // (Removed weaponAvgDamage input — the hardcoded baseline + WEPDMG affix already matches the in-game tooltip.)
 
   if (slot.affixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
 
@@ -326,8 +346,8 @@ function extraAdditiveCard() {
 
 // ---------- Standalone multipliers ----------
 function extraMultsCard() {
-  const card = sectionCard('Standalone [x] Multipliers',
-    'Aspects/uniques like Grandfather. Each one its own factor.');
+  const card = sectionCard('Standalone x% Multipliers',
+    'For aspects/uniques that grant a flat damage multiplier (like Grandfather x100% or Heir of Perdition x80%). Each one its own factor in the formula. ⚠️ Do NOT use this for “x% Main Stat” (use the +% Main Stat Mult affix on a slot instead) or for affixes that share a named bucket like Critical Strike Damage Mult / Vulnerable Damage Mult — those need to land in their bucket via a slot.');
   build.extraMultipliers.forEach((m, idx) => {
     const row = el('div', { class: 'flex gap-2 mb-2 items-center' });
     row.append(textInput(() => m.label, v => m.label = v, { w: 'flex-1', placeholder: 'Name' }));
@@ -429,7 +449,8 @@ function bucketsCard() {
     { affix: '+10% Critical Strike Damage',            bucket: 'on crits', gain: weightFor(build, 'CRITADD', 0.10, refScenario) },
     { affix: '+10% Damage (additive bucket)',          bucket: 'always-on', gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) },
     { affix: `+200 ${cls.mainStat}`,                   bucket: 'main stat', gain: weightFor(build, 'MAINSTAT', 200, refScenario) },
-    { affix: '+10% Critical Strike Chance',            bucket: c.critChance >= 1 ? 'CAPPED at 100%' : 'crit roll rate', gain: weightFor(build, 'CRITCHANCE', 0.10, refScenario) },
+    { affix: `x10% ${cls.mainStat} Multiplier`,         bucket: 'main stat mult', gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) },
+    { affix: '+10% Critical Strike Chance',            bucket: c.critChance >= 1 ? '⚠️ CAPPED at 100% — wasted slot' : 'crit roll rate', gain: weightFor(build, 'CRITCHANCE', 0.10, refScenario) },
     { affix: '+196 Weapon Damage Roll',                bucket: 'multiplies all', gain: weightFor(build, 'WEPDMG', 196, refScenario) },
     { affix: '+5 Skill Ranks',                         bucket: 'skill coef', gain: weightFor(build, 'SKILLRANK', 5, refScenario) },
   ];

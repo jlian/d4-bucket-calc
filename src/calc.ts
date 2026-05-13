@@ -60,7 +60,7 @@ export function weaponTypeById(id: string): WeaponType {
 export type Bucket =
   | 'CSDM' | 'VDM' | 'DOTM' | 'ALLM' | 'NONPHYS'
   | 'ADDITIVE' | 'CRITADD'
-  | 'MAINSTAT' | 'WEPDMG' | 'GEM'
+  | 'MAINSTAT' | 'MAINSTAT_PCT' | 'WEPDMG' | 'GEM'
   | 'CRITCHANCE' | 'SKILLRANK' | 'EXTRAMULT';
 
 export interface Affix { bucket: Bucket; value: number; label?: string; }
@@ -69,8 +69,6 @@ export interface Slot {
   id: string;
   name: string;
   weaponTypeId?: string;
-  // Optional user-entered avg damage for weapon slots (overrides the hardcoded baseDamage)
-  weaponAvgDamage?: number;
   affixes: Affix[];
 }
 
@@ -83,13 +81,28 @@ export const DEFAULT_SLOTS: Slot[] = [
   { id: 'amulet',  name: 'Amulet',  affixes: [] },
   { id: 'ring1',   name: 'Ring 1',  affixes: [] },
   { id: 'ring2',   name: 'Ring 2',  affixes: [] },
-  { id: 'wep1',    name: 'Weapon 1 / Off-hand', weaponTypeId: 'none', affixes: [] },
-  { id: 'wep2',    name: 'Weapon 2',            weaponTypeId: 'none', affixes: [] },
-  { id: 'wep3',    name: 'Weapon 3 (Rogue/Barb)', weaponTypeId: 'none', affixes: [] },
-  { id: 'wep4',    name: 'Weapon 4 (Barb)',     weaponTypeId: 'none', affixes: [] },
-  // Non-gear container: paragon glyph legendary mults, charm/seal [×] mults, anything that
-  // contributes affixes to a named bucket without being on equipped armor/weapon/jewelry.
-  { id: 'paragon', name: 'Non-gear (Paragon / Glyphs / Charms / Seal)', affixes: [] },
+  { id: 'wep1',    name: 'Weapon 1', weaponTypeId: 'none', affixes: [] },
+  { id: 'wep2',    name: 'Weapon 2', weaponTypeId: 'none', affixes: [] },
+  { id: 'wep3',    name: 'Weapon 3', weaponTypeId: 'none', affixes: [] },
+  { id: 'wep4',    name: 'Weapon 4', weaponTypeId: 'none', affixes: [] },
+  // Catch-all for anything that contributes to a named bucket without being on equipped armor/jewelry/weapons.
+  { id: 'paragon', name: 'Paragon Nodes (legendary / rare / magic)', affixes: [] },
+  // Charm slots (LoH): 1 unique + 6 set
+  { id: 'charmU',  name: 'Unique Charm', affixes: [] },
+  { id: 'charm1',  name: 'Set Charm 1', affixes: [] },
+  { id: 'charm2',  name: 'Set Charm 2', affixes: [] },
+  { id: 'charm3',  name: 'Set Charm 3', affixes: [] },
+  { id: 'charm4',  name: 'Set Charm 4', affixes: [] },
+  { id: 'charm5',  name: 'Set Charm 5', affixes: [] },
+  { id: 'charm6',  name: 'Set Charm 6', affixes: [] },
+  // Horadric Seal
+  { id: 'seal',    name: 'Horadric Seal', affixes: [] },
+  // Glyphs (5 max for Paladin/most classes)
+  { id: 'glyph1',  name: 'Glyph 1', affixes: [] },
+  { id: 'glyph2',  name: 'Glyph 2', affixes: [] },
+  { id: 'glyph3',  name: 'Glyph 3', affixes: [] },
+  { id: 'glyph4',  name: 'Glyph 4', affixes: [] },
+  { id: 'glyph5',  name: 'Glyph 5', affixes: [] },
 ];
 
 // ---- Additive lines (matches in-game UI order) ----
@@ -210,11 +223,7 @@ export function computeWeaponDamage(b: Build): { dmg: number; speed: number; has
     if (!isWeaponSlot) continue;
     if (slot.weaponTypeId) {
       const wt = weaponTypeById(slot.weaponTypeId);
-      // Prefer user-entered average damage; fall back to hardcoded BIS baseline
-      const base = (slot.weaponAvgDamage && slot.weaponAvgDamage > 0)
-        ? slot.weaponAvgDamage
-        : wt.baseDamage;
-      if (base > 0) { dmg += base; hasAny = true; }
+      if (wt.baseDamage > 0) { dmg += wt.baseDamage; hasAny = true; }
       if (wt.speed > 0) { speedSum += wt.speed; speedCount++; }
     }
     for (const a of slot.affixes) if (a.bucket === 'WEPDMG') dmg += a.value;
@@ -232,7 +241,9 @@ export function computeWeaponDamage(b: Build): { dmg: number; speed: number; has
 export function calc(b: Build): Calc {
   const cls = classFor(b);
 
-  const mainStatSum = b.baseMainStat + b.extraMainStat + sumAffixes(b.slots, 'MAINSTAT');
+  const mainStatRaw = b.baseMainStat + b.extraMainStat + sumAffixes(b.slots, 'MAINSTAT');
+  const mainStatPctMult = 1 + sumAffixes(b.slots, 'MAINSTAT_PCT');
+  const mainStatSum = mainStatRaw * mainStatPctMult;
   const mainStatMult = 1 + mainStatSum / cls.divisor;
 
   let critChance = b.baseCritChance + sumAffixes(b.slots, 'CRITCHANCE');
@@ -318,8 +329,14 @@ export function scenarioDamageNoCrit(b: Build, scenario: Scenario): number {
 function gainFromAddInScenario(b: Build, bucket: Bucket, delta: number, scenario: Scenario): number {
   const before = scenarioDamage(b, scenario);
   if (before === 0) return 0;
-  // Cheap clone: only need slots[0].affixes mutable, share the rest
-  const test: Build = { ...b, snapshot: null, slots: b.slots.map((s, i) => i === 0 ? { ...s, affixes: [...s.affixes, { bucket, value: delta }] } : s) };
+  // Pick a slot where the affix would actually count. WEPDMG/GEM only sum on weapon slots; everything else can land anywhere.
+  let targetIdx = 0;
+  if (bucket === 'WEPDMG' || bucket === 'GEM') {
+    targetIdx = b.slots.findIndex(s => s.id.startsWith('wep') && s.weaponTypeId && s.weaponTypeId !== 'none');
+    if (targetIdx === -1) targetIdx = b.slots.findIndex(s => s.id === 'wep1');
+  }
+  if (targetIdx < 0) targetIdx = 0;
+  const test: Build = { ...b, snapshot: null, slots: b.slots.map((s, i) => i === targetIdx ? { ...s, affixes: [...s.affixes, { bucket, value: delta }] } : s) };
   return scenarioDamage(test, scenario) / before - 1;
 }
 
@@ -330,22 +347,23 @@ export function weightFor(b: Build, bucket: Bucket, typical: number, scenario: S
 
 // ---- Bucket display ----
 export const BUCKET_META: Record<Bucket, { label: string; isPercent: boolean; typicalRoll: number }> = {
-  CSDM:       { label: 'x% Critical Strike Damage Multiplier',  isPercent: true,  typicalRoll: 0.10 },
-  VDM:        { label: 'x% Vulnerable Damage Multiplier',       isPercent: true,  typicalRoll: 0.10 },
-  DOTM:       { label: 'x% Damage Over Time Multiplier',        isPercent: true,  typicalRoll: 0.10 },
-  ALLM:       { label: 'x% All / Element Damage Multiplier',    isPercent: true,  typicalRoll: 0.10 },
-  NONPHYS:    { label: 'x% Non-Physical Damage',                isPercent: true,  typicalRoll: 0.10 },
-  ADDITIVE:   { label: '+% Damage (additive bucket)',           isPercent: true,  typicalRoll: 0.10 },
-  CRITADD:    { label: '+% Critical Strike Damage',             isPercent: true,  typicalRoll: 0.10 },
-  MAINSTAT:   { label: '+ Main Stat (Str/Dex/Int/Will)',        isPercent: false, typicalRoll: 200 },
-  WEPDMG:     { label: '+ Weapon Damage Roll',                  isPercent: false, typicalRoll: 196 },
-  GEM:        { label: 'Weapon Gem (sums into All / Element)',  isPercent: true,  typicalRoll: 0.10 },
-  CRITCHANCE: { label: '+% Critical Strike Chance',             isPercent: true,  typicalRoll: 0.10 },
-  SKILLRANK:  { label: '+ Skill Ranks',                         isPercent: false, typicalRoll: 5 },
-  EXTRAMULT:  { label: 'x% Standalone Multiplier (aspect/unique)', isPercent: true, typicalRoll: 0.10 },
+  CSDM:         { label: 'x% Critical Strike Damage Multiplier',  isPercent: true,  typicalRoll: 0.10 },
+  VDM:          { label: 'x% Vulnerable Damage Multiplier',       isPercent: true,  typicalRoll: 0.10 },
+  DOTM:         { label: 'x% Damage Over Time Multiplier',        isPercent: true,  typicalRoll: 0.10 },
+  ALLM:         { label: 'x% All / Element Damage Multiplier',    isPercent: true,  typicalRoll: 0.10 },
+  NONPHYS:      { label: 'x% Non-Physical Damage',                isPercent: true,  typicalRoll: 0.10 },
+  ADDITIVE:     { label: '+% Damage (additive bucket)',           isPercent: true,  typicalRoll: 0.10 },
+  CRITADD:      { label: '+% Critical Strike Damage',             isPercent: true,  typicalRoll: 0.10 },
+  MAINSTAT:     { label: '+ Main Stat (Str/Dex/Int/Will)',        isPercent: false, typicalRoll: 200 },
+  MAINSTAT_PCT: { label: 'x% Main Stat Multiplier',               isPercent: true,  typicalRoll: 0.10 },
+  WEPDMG:       { label: '+ Weapon Damage',                       isPercent: false, typicalRoll: 196 },
+  GEM:          { label: 'Weapon Gem (sums into All / Element)',  isPercent: true,  typicalRoll: 0.10 },
+  CRITCHANCE:   { label: '+% Critical Strike Chance',             isPercent: true,  typicalRoll: 0.10 },
+  SKILLRANK:    { label: '+ Skill Ranks',                         isPercent: false, typicalRoll: 5 },
+  EXTRAMULT:    { label: 'x% Standalone Multiplier (aspect/unique)', isPercent: true, typicalRoll: 0.10 },
 };
 
-export const BUCKET_ORDER: Bucket[] = ['CSDM','VDM','DOTM','ALLM','NONPHYS','ADDITIVE','CRITADD','MAINSTAT','WEPDMG','GEM','CRITCHANCE','SKILLRANK','EXTRAMULT'];
+export const BUCKET_ORDER: Bucket[] = ['CSDM','VDM','DOTM','ALLM','NONPHYS','ADDITIVE','CRITADD','MAINSTAT','MAINSTAT_PCT','WEPDMG','GEM','CRITCHANCE','SKILLRANK','EXTRAMULT'];
 
 export function presetScenarios(): Scenario[] {
   return [
