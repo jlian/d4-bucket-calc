@@ -578,48 +578,30 @@ function additiveBreakdown(b: Build, conds: any): string {
   return parts.length ? ` — sum of ${parts.join(', ')}` : '';
 }
 
-function additiveBreakdownMath(b: Build, conds: any): string {
+function additiveBreakdownMath(b: Build, conds: any, includeCrit: boolean): string {
   const parts: string[] = [];
   for (const l of b.additiveLines) {
-    if (l.isCritOnly) continue;
-    if (l.applies(conds) && l.value > 0) parts.push(l.value.toFixed(2));
-  }
-  let slotAdd = 0;
-  for (const slot of b.slots) for (const aa of slot.affixes) if (aa.bucket === 'ADDITIVE') slotAdd += aa.value;
-  if (slotAdd > 0) parts.push(slotAdd.toFixed(2));
-  return parts.length ? `1 + ${parts.join(' + ')}` : '';
-}
-
-function additiveCritBreakdownMath(b: Build, conds: any): string {
-  // Same as above but also include crit-only lines + CRITADD affixes
-  const parts: string[] = [];
-  for (const l of b.additiveLines) {
-    if (l.applies(conds) && l.value > 0) parts.push(l.value.toFixed(2));
+    if (l.isCritOnly && !includeCrit) continue;
+    if (l.applies({ ...conds, isCrit: includeCrit }) && l.value > 0) parts.push(l.value.toFixed(2));
   }
   let slotAdd = 0, slotCritAdd = 0;
   for (const slot of b.slots) for (const aa of slot.affixes) {
     if (aa.bucket === 'ADDITIVE') slotAdd += aa.value;
-    if (aa.bucket === 'CRITADD') slotCritAdd += aa.value;
+    if (aa.bucket === 'CRITADD' && includeCrit) slotCritAdd += aa.value;
   }
   if (slotAdd > 0) parts.push(slotAdd.toFixed(2));
   if (slotCritAdd > 0) parts.push(slotCritAdd.toFixed(2));
-  // include the naked 'crit' additive line via critOnly
-  for (const l of b.additiveLines) if (l.isCritOnly && l.value > 0) {
-    // already included via .applies(conds) when crit; but the loop above only adds non-crit when conds.isCrit is false
-    // Force include it here to be safe
-    if (!parts.includes(l.value.toFixed(2))) parts.push(l.value.toFixed(2));
-  }
   return parts.length ? `1 + ${parts.join(' + ')}` : '';
 }
 
 function extraMultMath(b: Build): string {
-  const factors: string[] = [];
+  const factors: { label: string; v: number }[] = [];
   for (const slot of b.slots) for (const aa of slot.affixes) {
-    if (aa.bucket === 'EXTRAMULT' && aa.value !== 0) factors.push((1 + aa.value).toFixed(2));
+    if (aa.bucket === 'EXTRAMULT' && aa.value !== 0) factors.push({ label: aa.label || '?', v: 1 + aa.value });
   }
   if (factors.length === 0) return '';
-  if (factors.length > 6) return `${factors.length} factors multiplied`;
-  return factors.join(' × ');
+  // Inline the math — okay even if many factors. Multi-line will wrap in the cell.
+  return factors.map(f => f.v.toFixed(2)).join(' × ');
 }
 
 function buildPluggedIn(): HTMLElement {
@@ -658,20 +640,23 @@ function buildPluggedIn(): HTMLElement {
   )));
   type Row = [string, string, string, number];
   // Order matches the formula left-to-right
-  const addBreakdownMath = additiveBreakdownMath(build, conds);
-  const addCritBreakdownMath = isDot ? '' : additiveCritBreakdownMath(build, conds);
+  // For non-DoT, A includes the +Crit Damage additive when on a crit hit.
+  // We always show the (1+A) row with the value used in the equation (crit-inclusive when applicable).
+  const usedAdd = isDot ? additive : (additive + critAdd);
+  const isCritContext = !isDot;
+  const addMath = additiveBreakdownMath(build, conds, isCritContext);
+  const addDesc = isDot
+    ? 'always-on additive damage bucket'
+    : (critAdd > 0
+        ? `additive bucket on a crit (includes +${dec(critAdd)} from + Crit Damage affixes; non-crit hits use ${dec(1 + additive)} instead)`
+        : 'always-on additive damage bucket (no separate +Crit Damage affixes)');
   const rows: Row[] = [
     ['W',                       'avg weapon damage',                                                  '',                                            c.weaponDmg],
-    ['(1 + A)',                 isDot ? 'always-on additive damage bucket' : 'always-on additive damage bucket (used for non-crit hits)',   addBreakdownMath || `1 + ${dec(additive)}`,                        1 + additive],
-  ];
-  if (!isDot && critAdd > 0) {
-    rows.push(['(1 + A + CRITADD)', `additive bucket on a crit (CRITADD = +${dec(critAdd)} from + Crit Damage affixes)`, addCritBreakdownMath || `1 + ${dec(additive)} + ${dec(critAdd)}`, 1 + additive + critAdd]);
-  }
-  rows.push(
+    ['(1 + A)',                 addDesc,                                                              addMath || `1 + ${dec(usedAdd)}`,             1 + usedAdd],
     [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier`,                                        `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
     ['C',                       `skill damage % at ${c.totalSkillRanks} ranks (rank-1 × step formula)`, `${dec(build.skillDamagePct)} × ${dec(c.skillCoef / Math.max(build.skillDamagePct, 1e-9))}`, c.skillCoef],
     [String.raw`\prod_i M_i`,    'product of standalone aspects/uniques',                            extraMultMath(build),                          c.extraMultProduct],
-  );
+  ];
   if (!isDot) {
     rows.push([String.raw`(1.5 \cdot M_{crit})^c`, `crit factor (c=1 if hit crits, else 0). Bucket sum = ${dec(c.csdm)}`, `1.5 × ${dec(c.csdm)}`, c.csdm * 1.5]);
     rows.push([String.raw`(1.2 \cdot M_{vuln})^v`, `vulnerable factor (v=1 if target is vulnerable, else 0). Bucket sum = ${dec(c.vdm)}`, conds.vulnerable ? `1.2 × ${dec(c.vdm)}` : 'inactive (v = 0)', vdmFactor]);
@@ -686,7 +671,7 @@ function buildPluggedIn(): HTMLElement {
     tb.append(el('tr', { class: 'border-b border-zinc-900 align-top' },
       el('td', { class: 'py-1 pr-3 align-top' }, katexInline(sym)),
       el('td', { class: 'py-1 text-zinc-400 align-top' }, desc),
-      el('td', { class: 'py-1 text-right text-zinc-500 font-mono tabular-nums whitespace-nowrap pl-2 align-top' }, math),
+      el('td', { class: 'py-1 text-right text-zinc-500 font-mono tabular-nums pl-2 align-top' }, math),
       el('td', { class: 'py-1 text-right font-mono text-amber-400 tabular-nums whitespace-nowrap pl-3 align-top' }, dec(val, 2)),
     ));
   }
