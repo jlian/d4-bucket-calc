@@ -255,8 +255,8 @@ function slotBlock(slot: Slot) {
   if (slot.affixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
 
   slot.affixes.forEach((a, idx) => {
-    const row = el('div', { class: 'flex gap-2 mb-1.5 items-center min-w-0' });
-    const sel = el('select', { class: inputCls() + ' flex-1 min-w-0' }) as HTMLSelectElement;
+    const row = el('div', { class: 'flex flex-wrap sm:flex-nowrap gap-2 mb-1.5 items-center min-w-0' });
+    const sel = el('select', { class: inputCls() + ' w-full sm:flex-1 min-w-0' }) as HTMLSelectElement;
     for (const b of BUCKET_ORDER) {
       if (!isWeapon && (b === 'WEPDMG' || b === 'GEM')) continue;
       const opt = el('option', { value: b }, BUCKET_META[b].label);
