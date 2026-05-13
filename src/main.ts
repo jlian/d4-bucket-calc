@@ -215,6 +215,27 @@ function nakedBaselineCard() {
     grid.append(row);
   }
   card.append(grid);
+
+  // Custom additive entries: for additive stat lines that exist in the in-game offensive tab but aren't in our default list (e.g., Rogue's Damage with Imbued, Damage vs Distant)
+  card.append(el('h4', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-4 mb-2' }, 'Other additive lines'));
+  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'For additive damage lines on your in-game offensive tab that aren’t in the default list above (e.g., Rogue’s “Damage with Imbued”, “Damage vs Distant”, etc.). Same rule: copy the BOTTOM tooltip number from the offensive tab.'));
+  const paragonSlot = build.slots.find(s => s.id === 'paragon');
+  if (paragonSlot) {
+    const customAdds = paragonSlot.affixes.filter(a => a.bucket === 'ADDITIVE');
+    customAdds.forEach((a) => {
+      const row = el('div', { class: 'flex items-center gap-2 mb-1.5' });
+      row.append(textInput(() => a.label ?? '', v => { a.label = v; }, { w: 'flex-1', placeholder: 'e.g. Damage with Imbued' }));
+      row.append(pctInput(() => a.value, v => a.value = v, { w: 'w-24' }));
+      row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
+      const del = el('button', { class: 'text-zinc-500 hover:text-red-400 px-2' }, '✕');
+      del.addEventListener('click', () => { paragonSlot.affixes.splice(paragonSlot.affixes.indexOf(a), 1); mount(); });
+      row.append(del);
+      card.append(row);
+    });
+    const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-1 rounded border border-amber-700/50 mt-1' }, '+ Add other additive line');
+    addBtn.addEventListener('click', () => { paragonSlot.affixes.push({ bucket: 'ADDITIVE' as Bucket, value: 0, label: '' }); mount(); });
+    card.append(addBtn);
+  }
   return card;
 }
 
