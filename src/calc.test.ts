@@ -27,9 +27,8 @@ function makeReferencePaladin(): Build {
     classId: 'Paladin',
     baseMainStat: 485,
     extraMainStat: 500,
-    skillCoefL1: 0.45,
-    skillRanks: 15,
-    extraSkillRanks: 14,
+    skillDamagePct: 1.8225,  // 0.45 base × (1 + 0.10*(29-5-1) + 0.15*5) per old step formula
+    totalSkillRanks: 29,
     baseCritChance: 1.0,         // overcapped in example
     enemyDR: 0.2,
     disableCrit: false,

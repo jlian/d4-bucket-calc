@@ -143,14 +143,13 @@ export interface Build {
   additiveLines: AdditiveLine[];
   extraAdditive: { label: string; value: number }[];
   skillName: string;
-  skillCoefL1: number;
-  skillRanks: number;
-  extraSkillRanks: number;
+  skillDamagePct: number;       // current in-game skill damage % (e.g., 4.03 for 403%)
+  totalSkillRanks: number;      // user-entered total ranks; used for + Skill Ranks affix preview
   baseCritChance: number;
-  attackSpeedBonus: number;        // % from Offensive tab
-  weaponSpeedOverride: number | null; // null = use weapon type baseline
+  attackSpeedBonus: number;
+  weaponSpeedOverride: number | null;
   disableCrit: boolean;
-  enemyDR: number;                 // fixed at 0.20 = 80% reduction
+  enemyDR: number;
   slots: Slot[];
   extraMultipliers: { label: string; value: number }[];
   snapshot?: Build | null;
@@ -163,9 +162,8 @@ export const DEFAULT_BUILD: Build = {
   additiveLines: cloneDefaultLines(),
   extraAdditive: [],
   skillName: 'Main Skill',
-  skillCoefL1: 0.45,
-  skillRanks: 5,
-  extraSkillRanks: 0,
+  skillDamagePct: 0.45,        // 45% (rank-1 default; user typically overrides with their in-game value)
+  totalSkillRanks: 5,
   baseCritChance: 0.05,
   attackSpeedBonus: 0,
   weaponSpeedOverride: null,
@@ -234,12 +232,12 @@ export function calc(b: Build): Calc {
   if (b.disableCrit) critChance = 0;
   critChance = Math.max(0, Math.min(1, critChance));
 
-  const totalSkillRanks = b.skillRanks + b.extraSkillRanks + sumAffixes(b.slots, 'SKILLRANK');
-  let skillCoef = b.skillCoefL1;
-  if (totalSkillRanks > 0) {
-    const N = totalSkillRanks, f = Math.floor(N / 5);
-    skillCoef = b.skillCoefL1 * (1 + 0.10 * (N - f - 1) + 0.15 * f);
-  }
+  // Skill ranks: user enters totalSkillRanks directly; gear SKILLRANK affixes add on top.
+  // Skill damage % is taken AS-IS from the in-game tooltip (already includes rank scaling).
+  const totalSkillRanks = b.totalSkillRanks + sumAffixes(b.slots, 'SKILLRANK');
+  // Each +1 skill rank ≈ +10% to skill damage % (rough heuristic for the "+5 Skill Ranks" affix preview).
+  // We anchor at the user's current skillDamagePct + their current totalSkillRanks.
+  const skillCoef = b.skillDamagePct * (1 + 0.10 * sumAffixes(b.slots, 'SKILLRANK'));
 
   const csdm = 1 + sumAffixes(b.slots, 'CSDM');
   const vdm  = 1 + sumAffixes(b.slots, 'VDM');

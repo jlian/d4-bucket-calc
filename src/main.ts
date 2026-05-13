@@ -172,11 +172,10 @@ function classSkillCard() {
   grid.append(field('Class', classSel));
 
   grid.append(field('Skill name', textInput(() => build.skillName, v => build.skillName = v, { w: 'w-full', placeholder: 'e.g. Holy Bolt' })));
-  grid.append(field('Skill Coef % (rank 1, e.g. 45)', pctInput(() => build.skillCoefL1, v => build.skillCoefL1 = v, { step: 0.5, w: 'w-full' })));
-  grid.append(field('Base Skill Ranks (1-baseline + bonuses)', numInput(() => build.skillRanks, v => build.skillRanks = v, { w: 'w-full' })));
-  grid.append(field('Extra Skill Ranks (charms / non-gear)', numInput(() => build.extraSkillRanks, v => build.extraSkillRanks = v, { w: 'w-full' })));
-  grid.append(field(`Base ${cls.mainStat} (no gear)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
-  grid.append(field(`Extra ${cls.mainStat} (charms)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
+  grid.append(field('Skill damage % (in-game tooltip, e.g. 403)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
+  grid.append(field('Total Skill Ranks', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
+  grid.append(field(`${cls.mainStat} (in-game total)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
+  grid.append(field(`Bonus ${cls.mainStat} (charms, leave 0 if N/A)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
 
   const checkWrap = el('label', { class: 'flex items-center gap-2 col-span-2 text-sm cursor-pointer mt-1' });
   const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
@@ -191,8 +190,8 @@ function classSkillCard() {
 
 // ---------- Card 2: Naked Baseline ----------
 function nakedBaselineCard() {
-  const card = sectionCard('Naked Baseline (Strip Your Gear)',
-    'Open Character Sheet → Offensive tab. Hover each line and use the BOTTOM number ("from items and Paragon"). Order matches in-game.');
+  const card = sectionCard('Damage Stats (from in-game Offensive tab)',
+    'Hover each line in your Character Sheet → Offensive tab and copy the BOTTOM tooltip number (“You have +X% of this stat from items and Paragon”). The inherent 50% crit and 20% vulnerable are baked into the formula — don’t add them.');
 
   const critRow = el('div', { class: 'mb-3 flex items-center gap-2' });
   critRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Critical Strike Chance'));
@@ -215,8 +214,8 @@ function nakedBaselineCard() {
 
 // ---------- Card 3: Gear Slots ----------
 function slotsCard() {
-  const card = sectionCard('Gear Slots',
-    'Add affixes per piece. For weapon slots, pick the weapon type to auto-fill base damage and weapon speed.');
+  const card = sectionCard('Gear Slots (optional)',
+    'Affixes here are used for the bucket-weight comparisons (“what if I added/removed this affix?”) and to model standalone aspects/uniques. Already-tooltip-aggregated stats (additive damage, main stat) are entered above and don’t need to be repeated here. For weapon slots, pick the weapon type to auto-fill base damage and weapon speed.');
   const cls = classFor(build);
   const weaponSlotCount = cls.weaponSlots;
   for (const slot of build.slots) {
@@ -258,8 +257,10 @@ function slotBlock(slot: Slot) {
   slot.affixes.forEach((a, idx) => {
     const row = el('div', { class: 'flex flex-wrap sm:flex-nowrap gap-2 mb-1.5 items-center min-w-0' });
     const sel = el('select', { class: inputCls() + ' w-full sm:flex-1 min-w-0' }) as HTMLSelectElement;
-    for (const b of BUCKET_ORDER) {
-      if (!isWeapon && (b === 'WEPDMG' || b === 'GEM')) continue;
+    // Sort dropdown alphabetically (excluding hidden buckets), with 'none' / first state stable
+    const candidates = BUCKET_ORDER.filter(b => isWeapon || (b !== 'WEPDMG' && b !== 'GEM'));
+    candidates.sort((x, y) => BUCKET_META[x].label.localeCompare(BUCKET_META[y].label));
+    for (const b of candidates) {
       const opt = el('option', { value: b }, BUCKET_META[b].label);
       if (b === a.bucket) opt.setAttribute('selected', '');
       sel.append(opt);
@@ -664,7 +665,7 @@ function workedExampleCard(): HTMLElement {
   } else {
     addRow('Crit Mult (CSDM × 1.5)', `${fmtMult(c.csdm)} × 1.5 = ${fmtMult(c.csdm * 1.5)} (on crit)`);
   }
-  addRow('Skill Coefficient (C)', `${num(c.skillCoef, 4)} (rank-1 ${num(build.skillCoefL1, 3)} × ${c.totalSkillRanks} ranks)`);
+  addRow('Skill Damage % (C)', `${(c.skillCoef*100).toFixed(1)}% (rank × base ${(build.skillDamagePct*100).toFixed(0)}% with ${c.totalSkillRanks} ranks)`);
   addRow('Standalone mults ∏Mi', fmtMult(c.extraMultProduct));
   addRow('Enemy DR (1 - R)', `${num(build.enemyDR, 2)} (${num((1-build.enemyDR)*100, 0)}% reduction)`);
   if (!scenario.isDot) {

@@ -76,9 +76,9 @@ function serialToBuild(j: any): Build {
     baseMainStat: validNumber(j.baseMainStat, DEFAULT_BUILD.baseMainStat),
     extraMainStat: validNumber(j.extraMainStat, 0),
     skillName: typeof j.skillName === 'string' ? j.skillName : DEFAULT_BUILD.skillName,
-    skillCoefL1: validNumber(j.skillCoefL1, DEFAULT_BUILD.skillCoefL1),
-    skillRanks: validNumber(j.skillRanks, DEFAULT_BUILD.skillRanks),
-    extraSkillRanks: validNumber(j.extraSkillRanks, 0),
+    // Migrate old skillCoefL1/skillRanks/extraSkillRanks fields
+    skillDamagePct: validNumber(j.skillDamagePct ?? j.skillCoefL1, DEFAULT_BUILD.skillDamagePct),
+    totalSkillRanks: validNumber(j.totalSkillRanks ?? ((j.skillRanks ?? 0) + (j.extraSkillRanks ?? 0)), DEFAULT_BUILD.totalSkillRanks),
     baseCritChance: validNumber(j.baseCritChance, DEFAULT_BUILD.baseCritChance),
     attackSpeedBonus: validNumber(j.attackSpeedBonus, 0),
     weaponSpeedOverride: j.weaponSpeedOverride == null ? null : validNumber(j.weaponSpeedOverride, 0),
