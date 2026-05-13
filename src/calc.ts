@@ -69,6 +69,8 @@ export interface Slot {
   id: string;
   name: string;
   weaponTypeId?: string;
+  // Optional user-entered avg damage for weapon slots (overrides the hardcoded baseDamage)
+  weaponAvgDamage?: number;
   affixes: Affix[];
 }
 
@@ -81,11 +83,13 @@ export const DEFAULT_SLOTS: Slot[] = [
   { id: 'amulet',  name: 'Amulet',  affixes: [] },
   { id: 'ring1',   name: 'Ring 1',  affixes: [] },
   { id: 'ring2',   name: 'Ring 2',  affixes: [] },
-  // Weapon slots: visibility per class is filtered in main.ts (Barb=4, Rogue=3, Spiritborn=1, others=2)
   { id: 'wep1',    name: 'Weapon 1 / Off-hand', weaponTypeId: 'none', affixes: [] },
   { id: 'wep2',    name: 'Weapon 2',            weaponTypeId: 'none', affixes: [] },
   { id: 'wep3',    name: 'Weapon 3 (Rogue/Barb)', weaponTypeId: 'none', affixes: [] },
   { id: 'wep4',    name: 'Weapon 4 (Barb)',     weaponTypeId: 'none', affixes: [] },
+  // Non-gear container: paragon glyph legendary mults, charm/seal [×] mults, anything that
+  // contributes affixes to a named bucket without being on equipped armor/weapon/jewelry.
+  { id: 'paragon', name: 'Non-gear (Paragon / Glyphs / Charms / Seal)', affixes: [] },
 ];
 
 // ---- Additive lines (matches in-game UI order) ----
@@ -203,14 +207,17 @@ export function computeWeaponDamage(b: Build): { dmg: number; speed: number; has
   let dmg = 0, hasAny = false, speedSum = 0, speedCount = 0;
   for (const slot of b.slots) {
     const isWeaponSlot = slot.id.startsWith('wep');
+    if (!isWeaponSlot) continue;
     if (slot.weaponTypeId) {
       const wt = weaponTypeById(slot.weaponTypeId);
-      if (wt.baseDamage > 0) { dmg += wt.baseDamage; hasAny = true; }
+      // Prefer user-entered average damage; fall back to hardcoded BIS baseline
+      const base = (slot.weaponAvgDamage && slot.weaponAvgDamage > 0)
+        ? slot.weaponAvgDamage
+        : wt.baseDamage;
+      if (base > 0) { dmg += base; hasAny = true; }
       if (wt.speed > 0) { speedSum += wt.speed; speedCount++; }
     }
-    if (isWeaponSlot) {
-      for (const a of slot.affixes) if (a.bucket === 'WEPDMG') dmg += a.value;
-    }
+    for (const a of slot.affixes) if (a.bucket === 'WEPDMG') dmg += a.value;
   }
   // Barbarian dual-2H bonus (legacy spreadsheet behavior; only meaningful when Barb has both wep1+wep2 as 2H weapons)
   if (b.classId === 'Barbarian' && hasAny) {

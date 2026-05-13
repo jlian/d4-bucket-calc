@@ -95,8 +95,9 @@ function mount() {
   const left = el('div', { class: 'space-y-6' });
   left.append(classSkillCard());
   left.append(nakedBaselineCard());
-  left.append(extraAdditiveCard()); // moved above gear
   left.append(slotsCard());
+  left.append(paragonContributionsCard());
+  left.append(extraAdditiveCard());
   left.append(extraMultsCard());
   main.append(left);
 
@@ -116,7 +117,6 @@ function refreshOutputs() {
   if (!right) return;
   right.innerHTML = '';
   right.append(scenariosCard());
-  right.append(dpsCard());
   right.append(bucketsCard());
   right.append(statsCard());
 }
@@ -174,8 +174,8 @@ function classSkillCard() {
   grid.append(field('Skill name', textInput(() => build.skillName, v => build.skillName = v, { w: 'w-full', placeholder: 'e.g. Holy Bolt' })));
   grid.append(field('Skill damage % (in-game tooltip, e.g. 403)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
   grid.append(field('Total Skill Ranks', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
-  grid.append(field(`${cls.mainStat} (in-game total)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
-  grid.append(field(`Bonus ${cls.mainStat} (charms, leave 0 if N/A)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
+  grid.append(field(`${cls.mainStat} (naked, no gear/charms)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
+  grid.append(field(`Bonus ${cls.mainStat} (charms / seal / talisman)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
 
   const checkWrap = el('label', { class: 'flex items-center gap-2 col-span-2 text-sm cursor-pointer mt-1' });
   const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
@@ -190,8 +190,8 @@ function classSkillCard() {
 
 // ---------- Card 2: Naked Baseline ----------
 function nakedBaselineCard() {
-  const card = sectionCard('Damage Stats (from in-game Offensive tab)',
-    'Hover each line in your Character Sheet → Offensive tab and copy the BOTTOM tooltip number (“You have +X% of this stat from items and Paragon”). The inherent 50% crit and 20% vulnerable are baked into the formula — don’t add them.');
+  const card = sectionCard('Damage Stats (Naked Baseline)',
+    'Strip ALL gear including charms/seal. Open Character Sheet → Offensive tab. Hover each line and copy the BOTTOM tooltip number (“You have +X% of this stat from items and Paragon”). The inherent 50% crit and 20% vulnerable are baked into the formula — don’t add them. This captures all your paragon additive damage cleanly without any gear interference.');
 
   const critRow = el('div', { class: 'mb-3 flex items-center gap-2' });
   critRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Critical Strike Chance'));
@@ -214,12 +214,12 @@ function nakedBaselineCard() {
 
 // ---------- Card 3: Gear Slots ----------
 function slotsCard() {
-  const card = sectionCard('Gear Slots (optional)',
-    'Affixes here are used for the bucket-weight comparisons (“what if I added/removed this affix?”) and to model standalone aspects/uniques. Already-tooltip-aggregated stats (additive damage, main stat) are entered above and don’t need to be repeated here. For weapon slots, pick the weapon type to auto-fill base damage and weapon speed.');
+  const card = sectionCard('Gear Slots',
+    'For each equipped item, pick the weapon type (weapons only) and add its affixes. The bucket weights and the worked formula example use these.');
   const cls = classFor(build);
   const weaponSlotCount = cls.weaponSlots;
   for (const slot of build.slots) {
-    // Hide weapon slots beyond what this class can use
+    if (slot.id === 'paragon') continue; // rendered separately
     const wepIdx = slot.id.startsWith('wep') ? parseInt(slot.id.slice(3), 10) : 0;
     if (wepIdx > 0 && wepIdx > weaponSlotCount) continue;
     card.append(slotBlock(slot));
@@ -227,19 +227,28 @@ function slotsCard() {
   return card;
 }
 
+function paragonContributionsCard() {
+  const card = sectionCard('Non-gear Contributions (Paragon / Glyphs / Charms / Seal)',
+    'For affixes that go into named buckets (CSDM, VDM, etc.) but don’t come from equipped gear: paragon glyph legendary mults, charm/seal [×] mults, etc. Pure additive paragon damage is already counted via the in-game Offensive tab “from items and Paragon” numbers above.');
+  const slot = build.slots.find(s => s.id === 'paragon');
+  if (slot) card.append(slotBlock(slot));
+  return card;
+}
+
 function slotBlock(slot: Slot) {
   const isWeapon = slot.id.startsWith('wep');
+  const isParagon = slot.id === 'paragon';
   const wrap = el('div', { class: 'border border-zinc-800 rounded-lg p-3 mb-2' });
 
   const header = el('div', { class: 'flex items-center gap-3 mb-2 flex-wrap' });
-  header.append(el('h3', { class: 'font-semibold text-zinc-200 mr-auto' }, slot.name));
+  if (!isParagon) header.append(el('h3', { class: 'font-semibold text-zinc-200 mr-auto' }, slot.name));
+  else header.append(el('span', { class: 'mr-auto' }));
 
   if (isWeapon) {
     const sel = el('select', { class: inputCls() + ' text-xs' }) as HTMLSelectElement;
     for (const wt of WEAPON_TYPES) {
-      // Filter to weapons usable by this class (or always show 'none')
       if (wt.allowedClasses && !wt.allowedClasses.includes(build.classId)) continue;
-      const opt = el('option', { value: wt.id }, wt.label + (wt.baseDamage ? ` — ${wt.baseDamage}×${wt.speed.toFixed(2)}/s` : ''));
+      const opt = el('option', { value: wt.id }, wt.label);
       if (wt.id === (slot.weaponTypeId ?? 'none')) opt.setAttribute('selected', '');
       sel.append(opt);
     }
@@ -251,6 +260,17 @@ function slotBlock(slot: Slot) {
   addBtn.addEventListener('click', () => { slot.affixes.push({ bucket: 'CSDM', value: 0 }); mount(); });
   header.append(addBtn);
   wrap.append(header);
+
+  // Weapon avg damage input (for non-BIS weapons)
+  if (isWeapon && slot.weaponTypeId && slot.weaponTypeId !== 'none') {
+    const wt = WEAPON_TYPES.find(w => w.id === slot.weaponTypeId);
+    if (wt && wt.baseDamage > 0) {
+      const wepRow = el('div', { class: 'flex items-center gap-2 mb-2 text-xs' });
+      wepRow.append(el('div', { class: 'text-zinc-500 flex-1' }, `Avg weapon damage (in-game tooltip; default ${wt.baseDamage} for max-rolled GA)`));
+      wepRow.append(numInput(() => slot.weaponAvgDamage ?? wt.baseDamage, v => { slot.weaponAvgDamage = v; }, { w: 'w-28' }));
+      wrap.append(wepRow);
+    }
+  }
 
   if (slot.affixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
 
@@ -382,38 +402,6 @@ function scenariosCard() {
   return card;
 }
 
-// ---------- OUTPUT: DPS ----------
-function dpsCard() {
-  const card = sectionCard('Attacks per Second (informational)',
-    'Approximate sustained ApS = base weapon ApS × (1 + AS%). Real DPS depends on per-skill animation breakpoints — most skills only gain DPS at specific AS thresholds.');
-
-  const c = calc(build);
-  const wsRow = el('div', { class: 'mb-2 flex items-center gap-2' });
-  wsRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Weapon ApS (auto)'));
-  const ws = el('span', { class: 'text-xs text-zinc-300 font-mono' }, c.weaponSpeed > 0 ? c.weaponSpeed.toFixed(2) + ' /s' : '— pick weapon');
-  wsRow.append(ws);
-  card.append(wsRow);
-
-  const asRow = el('div', { class: 'mb-2 flex items-center gap-2' });
-  asRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Attack Speed Bonus (Offensive tab)'));
-  asRow.append(pctInput(() => build.attackSpeedBonus, v => build.attackSpeedBonus = v, { w: 'w-24', step: 1 }));
-  asRow.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
-  card.append(asRow);
-
-  if (c.weaponDmg > 0 && c.effectiveAttackRate > 0) {
-    card.append(el('div', { class: 'mt-3 flex items-baseline justify-between' },
-      el('span', { class: 'text-zinc-400 text-sm' }, 'Effective ApS'),
-      el('span', { class: 'text-xl font-bold text-amber-400' }, c.effectiveAttackRate.toFixed(2) + ' /s'),
-    ));
-  }
-  card.append(el('p', { class: 'text-xs text-zinc-600 mt-3 italic' },
-    'Skills round to game frames. AS% only helps when it crosses a breakpoint. See Maxroll’s ',
-    Object.assign(el('a', { href: 'https://maxroll.gg/d4/resources/attack-speed-mechanics', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Attack Speed Mechanics' }),
-    ' guide for per-skill breakpoint tables. AS% caps at 200% (2 × 100% caps).',
-  ));
-  return card;
-}
-
 // ---------- OUTPUT: Buckets ----------
 function bucketsCard() {
   const card = sectionCard('Where to Spend Your Next Slot');
@@ -521,21 +509,20 @@ function bucketsCard() {
 
 function statsCard() {
   const c = calc(build);
-  const card = sectionCard('Internal Stats');
+  const cls = classFor(build);
+  const card = sectionCard('Stats Summary',
+    'Order mirrors the in-game Offensive tab. “Additive bucket” is a catch-all (sum of all +% damage lines across categories) and the in-game equivalent doesn’t exist — use it only for reference.');
+  const pctOf = (mult: number) => `+${((mult - 1) * 100).toFixed(1)}% (×${mult.toFixed(3)})`;
   const stats: [string, string][] = [
     ['Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : '— pick weapon'],
-    ['Weapon Speed', c.weaponSpeed ? c.weaponSpeed.toFixed(2) + '/s' : '—'],
-    ['Effective Rate', c.effectiveAttackRate ? c.effectiveAttackRate.toFixed(2) + '/s' : '—'],
-    ['Main Stat Sum', fmtNum(c.mainStatSum)],
-    ['Main Stat Mult', `×${c.mainStatMult.toFixed(3)}`],
-    ['Crit Chance', fmtPct(c.critChance)],
-    ['Skill Coef (eff.)', fmtPct(c.skillCoef)],
-    ['CSDM bucket (Crit Strike Damage ×)', `×${c.csdm.toFixed(3)}`],
-    ['VDM bucket (Vulnerable Damage ×)',  `×${c.vdm.toFixed(3)}`],
-    ['DOTM bucket (Damage over Time ×)',  `×${c.dotm.toFixed(3)}`],
-    ['All/Element Damage bucket',          `×${c.allm.toFixed(3)}`],
-    ['Extra Mults', `×${c.extraMultProduct.toFixed(3)}`],
-    ['Enemy DR', fmtPct(1 - build.enemyDR) + ' (fixed)'],
+    [`${cls.mainStat} (total)`, `${fmtNum(c.mainStatSum)} → ×${c.mainStatMult.toFixed(3)} multiplier`],
+    ['Skill Damage %', `+${(c.skillCoef * 100).toFixed(1)}% (${c.totalSkillRanks} ranks)`],
+    ['Critical Strike Chance', fmtPct(c.critChance, 1)],
+    ['Critical Strike Damage Mult', pctOf(c.csdm)],
+    ['Vulnerable Damage Mult', pctOf(c.vdm)],
+    ['Damage Over Time Mult', pctOf(c.dotm)],
+    ['All / Element Damage Mult', pctOf(c.allm)],
+    ['Standalone [×] product', `×${c.extraMultProduct.toFixed(3)} (${build.extraMultipliers.length} aspects/uniques)`],
   ];
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
@@ -571,7 +558,7 @@ function formulaCard() {
     ['W', 'Average weapon damage (a property of your equipped weapon)'],
     ['A', 'Sum of all additive damage % (the giant pool: vuln, elemental, distant, etc., plus +%damage tempers/aspects)'],
     ['S', `Total main stat (Strength/Dexterity/Intelligence/Willpower); divisor is ${divisor} for ${build.classId}`],
-    ['C', String.raw`Skill coefficient: \(\text{coef}_{1} \cdot \bigl(1 + 0.10\,(N - \lfloor N/5 \rfloor - 1) + 0.15\,\lfloor N/5 \rfloor\bigr)\) where \(N\) = total skill ranks (step bonus every 5 ranks)`],
+    ['C', 'Skill damage % at your current rank (taken as-is from the in-game advanced tooltip)'],
     ['M_i', 'Each standalone [x] aspect/unique multiplier (Grandfather, Godslayer, glyph legendary mults, etc.)'],
     ['CSDM', 'Critical Strike Damage Multiplier bucket: 1 + sum of all "[x] X% Critical Strike Damage Multiplier" affixes'],
     ['VDM', 'Vulnerable Damage Multiplier bucket: 1 + sum of all "[x] X% Vulnerable Damage Multiplier" affixes'],
@@ -619,17 +606,15 @@ function workedExampleCard(): HTMLElement {
   }
 
   const cls = classFor(build);
-  // Use the "vs Vulnerable Elite" scenario by default, or DoT if disabled
   const scenario = build.disableCrit
     ? presetScenarios().find(s => s.id === 'dot')!
     : presetScenarios().find(s => s.id === 'vuln_elite')!;
   const conds = scenario.conditions;
   const additive = additiveForScenario(build, conds);
   const critAdd = critOnlyAdditive(build);
-
-  // Effective factors (matching scenarioDamage logic)
   const vdmFactor = conds.vulnerable ? c.vdm * 1.2 : 1;
-  // recompute precisely the same way as calc to keep numbers honest
+
+  // Match scenarioDamage() exactly
   const base = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * build.enemyDR;
   const nonCritDmg = base * (1 + additive);
   const critDmg = base * (1 + additive + critAdd) * c.csdm * 1.5;
@@ -639,12 +624,12 @@ function workedExampleCard(): HTMLElement {
 
   const num = (n: number, d=2) => n.toLocaleString('en-US', { maximumFractionDigits: d });
   const fmtMult = (n: number) => `×${num(n, 3)}`;
+  const fmtAdd = (n: number) => `+${(n * 100).toFixed(1)}%`;
 
   wrap.append(el('p', { class: 'text-xs text-zinc-500 mb-3' },
     `Scenario: “${scenario.label}” · ${conds.vulnerable ? 'enemy is vulnerable, ' : ''}${conds.elites ? 'enemy is elite, ' : ''}${scenario.isDot ? 'DoT tick' : `${(c.critChance*100).toFixed(0)}% crit chance`}.`,
   ));
 
-  // Step-by-step table
   const tbl = el('table', { class: 'w-full text-xs' });
   const addRow = (label: string, value: string, hl?: boolean) =>
     tbl.append(el('tr', { class: 'border-b border-zinc-900' },
@@ -652,52 +637,65 @@ function workedExampleCard(): HTMLElement {
       el('td', { class: 'py-1 text-right tabular-nums font-mono ' + (hl ? 'text-amber-400 font-semibold' : 'text-zinc-300') }, value),
     ));
 
-  addRow('Weapon Damage (W)', num(c.weaponDmg));
-  addRow(`Main Stat (${cls.mainStat}, S)`, `${c.mainStatSum} → 1 + ${c.mainStatSum}/${cls.divisor} = ${fmtMult(c.mainStatMult)}`);
-  addRow('Additive bucket (1 + A)', `1 + ${num(additive, 3)} = ${fmtMult(1 + additive)}`);
-  if (!scenario.isDot) addRow('Crit-only additive (CRITADD)', critAdd ? `+${num(critAdd,3)}` : '0');
-  addRow('All / Element Mult (ALLM)', fmtMult(c.allm));
-  addRow('Vulnerable Mult (VDM)', conds.vulnerable
-    ? `${fmtMult(c.vdm)} × 1.20 baseline = ${fmtMult(vdmFactor)}`
-    : 'inactive (target not vulnerable)');
-  if (scenario.isDot) {
-    addRow('DoT Mult (DOTM)', fmtMult(c.dotm));
-  } else {
-    addRow('Crit Mult (CSDM × 1.5)', `${fmtMult(c.csdm)} × 1.5 = ${fmtMult(c.csdm * 1.5)} (on crit)`);
+  addRow('Weapon Damage', num(c.weaponDmg));
+  addRow(`${cls.mainStat} multiplier`, `${c.mainStatSum} → (1 + ${c.mainStatSum}/${cls.divisor}) = ${fmtMult(c.mainStatMult)}`);
+  addRow('Additive bucket (always-on)', `${fmtAdd(additive)} → ${fmtMult(1 + additive)}`);
+  if (!scenario.isDot && critAdd > 0) {
+    addRow('Crit-only additive bonus', `${fmtAdd(critAdd)} (added on crit)`);
   }
-  addRow('Skill Damage % (C)', `${(c.skillCoef*100).toFixed(1)}% (rank × base ${(build.skillDamagePct*100).toFixed(0)}% with ${c.totalSkillRanks} ranks)`);
-  addRow('Standalone mults ∏Mi', fmtMult(c.extraMultProduct));
-  addRow('Enemy DR (1 - R)', `${num(build.enemyDR, 2)} (${num((1-build.enemyDR)*100, 0)}% reduction)`);
+  addRow('All / Element Damage Mult', `${fmtAdd(c.allm - 1)} → ${fmtMult(c.allm)}`);
+  if (conds.vulnerable) {
+    addRow('Vulnerable Damage Mult', `${fmtAdd(c.vdm - 1)} bucket × 1.20 (inherent vuln) = ${fmtMult(vdmFactor)}`);
+  } else {
+    addRow('Vulnerable Damage Mult', 'inactive (target not vulnerable)');
+  }
+  if (scenario.isDot) {
+    addRow('Damage Over Time Mult', `${fmtAdd(c.dotm - 1)} → ${fmtMult(c.dotm)}`);
+  } else {
+    addRow('Crit Damage Mult', `${fmtAdd(c.csdm - 1)} bucket × 1.5 (inherent crit) = ${fmtMult(c.csdm * 1.5)} (on crit only)`);
+  }
+  addRow('Skill damage %', `${(c.skillCoef * 100).toFixed(1)}% (${c.totalSkillRanks} ranks)`);
+  if (c.extraMultProduct !== 1) {
+    addRow('Standalone mults product', fmtMult(c.extraMultProduct));
+  }
+  addRow('Enemy DR (training dummy)', `${num(build.enemyDR, 2)} (${num((1 - build.enemyDR) * 100, 0)}% reduction)`);
   if (!scenario.isDot) {
     addRow('Non-crit hit', num(nonCritDmg, 0));
     addRow('Crit hit', num(critDmg, 0));
-    addRow(`Crit chance weighting`, `${(c.critChance*100).toFixed(1)}% crit, ${((1-c.critChance)*100).toFixed(1)}% non-crit`);
+    addRow('Average (weighted by crit chance)', `${(c.critChance * 100).toFixed(1)}% crit + ${((1 - c.critChance) * 100).toFixed(1)}% non-crit`);
   }
   wrap.append(tbl);
 
-  // Final readout
   wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
     el('span', { class: 'text-sm text-zinc-300' }, scenario.isDot ? 'DoT tick damage' : 'Average damage per hit'),
     el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(avgDmg)),
   ));
 
-  // KaTeX rendered formula with substituted values
-  const ms = (1 + c.mainStatSum/cls.divisor).toFixed(3);
-  const partA = String.raw`D = ${num(c.weaponDmg)} \cdot (1 + ${num(additive,3)}) \cdot ${ms} \cdot ${num(c.skillCoef,4)} \cdot ${num(c.extraMultProduct,3)}`;
-  let partB = '';
-  if (!scenario.isDot) {
-    partB = String.raw` \cdot ${num(c.csdm,3)} \cdot 1.5`;
-    if (conds.vulnerable) partB += String.raw` \cdot ${num(c.vdm,3)} \cdot 1.2`;
+  // KaTeX rendered formula with substituted values — use Avg form (so it matches the readout above)
+  // Avg = nonCritDmg * (1 - cc) + critDmg * cc
+  // We show the crit branch since that's what 'Crit hit' is, then explain weighting.
+  const ms = (1 + c.mainStatSum / cls.divisor).toFixed(3);
+  if (scenario.isDot) {
+    const tex = String.raw`\text{DoT} = ${num(c.weaponDmg)} \cdot (1 + ${num(additive,3)}) \cdot ${ms} \cdot ${num(c.skillCoef,4)} \cdot ${num(c.extraMultProduct,3)} \cdot ${num(c.allm,3)} \cdot ${num(c.dotm,3)} \cdot ${num(build.enemyDR,2)}`;
+    wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(tex)));
   } else {
-    partB = String.raw` \cdot ${num(c.dotm,3)}`;
-  }
-  partB += String.raw` \cdot ${num(c.allm,3)} \cdot ${num(build.enemyDR,2)}`;
-  wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(partA + partB)));
+    // Non-crit branch
+    let texNoncrit = String.raw`\text{non-crit} = ${num(c.weaponDmg)} \cdot (1 + ${num(additive,3)}) \cdot ${ms} \cdot ${num(c.skillCoef,4)} \cdot ${num(c.extraMultProduct,3)} \cdot ${num(c.allm,3)}`;
+    if (conds.vulnerable) texNoncrit += String.raw` \cdot (${num(c.vdm,3)} \cdot 1.2)`;
+    texNoncrit += String.raw` \cdot ${num(build.enemyDR,2)}`;
+    wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(texNoncrit)));
 
-  // Note about ignored variables
-  wrap.append(el('p', { class: 'text-xs text-zinc-600 mt-2 italic' },
-    'Note: factors that don\u2019t apply to this scenario (e.g. crit on a non-crit hit, DoT mult on a direct hit) are omitted.',
-  ));
+    // Crit branch (includes critAdd inside the additive)
+    let texCrit = String.raw`\text{crit} = ${num(c.weaponDmg)} \cdot (1 + ${num(additive,3)} + ${num(critAdd,3)}) \cdot ${ms} \cdot ${num(c.skillCoef,4)} \cdot ${num(c.extraMultProduct,3)} \cdot ${num(c.allm,3)}`;
+    if (conds.vulnerable) texCrit += String.raw` \cdot (${num(c.vdm,3)} \cdot 1.2)`;
+    texCrit += String.raw` \cdot (${num(c.csdm,3)} \cdot 1.5) \cdot ${num(build.enemyDR,2)}`;
+    wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(texCrit)));
+
+    wrap.append(el('div', { class: 'mt-2 overflow-x-auto text-xs' }, katexBlock(
+      String.raw`\text{avg} = ${num(c.critChance,3)} \cdot \text{crit} + ${num(1-c.critChance,3)} \cdot \text{non-crit} = ${num(avgDmg, 0)}`,
+    )));
+  }
+
   return wrap;
 }
 

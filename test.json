@@ -1,0 +1,271 @@
+{
+  "classId": "Paladin",
+  "baseMainStat": 766,
+  "extraMainStat": 220,
+  "additiveLines": [
+    {
+      "id": "crit",
+      "value": 3.487
+    },
+    {
+      "id": "vulnerable",
+      "value": 0.313
+    },
+    {
+      "id": "all",
+      "value": 1.05
+    },
+    {
+      "id": "primaryElem",
+      "value": 0.517
+    },
+    {
+      "id": "ultimate",
+      "value": 0
+    },
+    {
+      "id": "close",
+      "value": 0
+    },
+    {
+      "id": "distant",
+      "value": 0
+    },
+    {
+      "id": "elites",
+      "value": 0.45
+    },
+    {
+      "id": "cc",
+      "value": 0.275
+    },
+    {
+      "id": "healthy",
+      "value": 0
+    }
+  ],
+  "extraAdditive": [],
+  "skillName": "Blessed Hammer",
+  "skillCoefL1": 1.15,
+  "skillRanks": 15,
+  "extraSkillRanks": 9,
+  "baseCritChance": 0.063,
+  "attackSpeedBonus": 0.23,
+  "weaponSpeedOverride": null,
+  "disableCrit": false,
+  "enemyDR": 0.2,
+  "slots": [
+    {
+      "id": "helm",
+      "name": "Helm",
+      "affixes": [
+        {
+          "bucket": "CRITCHANCE",
+          "value": 0.21
+        },
+        {
+          "bucket": "SKILLRANK",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "chest",
+      "name": "Chest",
+      "affixes": []
+    },
+    {
+      "id": "pants",
+      "name": "Pants",
+      "affixes": [
+        {
+          "bucket": "MAINSTAT",
+          "value": 182
+        },
+        {
+          "bucket": "MAINSTAT",
+          "value": 120
+        }
+      ]
+    },
+    {
+      "id": "boots",
+      "name": "Boots",
+      "affixes": [
+        {
+          "bucket": "MAINSTAT",
+          "value": 137
+        }
+      ]
+    },
+    {
+      "id": "gloves",
+      "name": "Gloves",
+      "affixes": [
+        {
+          "bucket": "CRITCHANCE",
+          "value": 0.106
+        },
+        {
+          "bucket": "CSDM",
+          "value": 0.6
+        },
+        {
+          "bucket": "ALLM",
+          "value": 0.2
+        },
+        {
+          "bucket": "SKILLRANK",
+          "value": 6
+        },
+        {
+          "bucket": "CRITADD",
+          "value": 0.63
+        }
+      ]
+    },
+    {
+      "id": "amulet",
+      "name": "Amulet",
+      "affixes": [
+        {
+          "bucket": "ALLM",
+          "value": 0.21
+        },
+        {
+          "bucket": "CRITCHANCE",
+          "value": 0.065
+        },
+        {
+          "bucket": "VDM",
+          "value": 0.2
+        },
+        {
+          "bucket": "CSDM",
+          "value": 1
+        },
+        {
+          "bucket": "CSDM",
+          "value": 0.67425
+        }
+      ]
+    },
+    {
+      "id": "ring1",
+      "name": "Ring 1",
+      "affixes": [
+        {
+          "bucket": "CRITCHANCE",
+          "value": 0.215
+        },
+        {
+          "bucket": "SKILLRANK",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "ring2",
+      "name": "Ring 2",
+      "affixes": [
+        {
+          "bucket": "MAINSTAT",
+          "value": 151
+        },
+        {
+          "bucket": "CSDM",
+          "value": 0.5
+        }
+      ]
+    },
+    {
+      "id": "wep1",
+      "name": "Weapon 1 / Off-hand",
+      "affixes": [
+        {
+          "bucket": "WEPDMG",
+          "value": 161
+        },
+        {
+          "bucket": "MAINSTAT",
+          "value": 220
+        },
+        {
+          "bucket": "CSDM",
+          "value": 0.21
+        },
+        {
+          "bucket": "ALLM",
+          "value": 0.13
+        },
+        {
+          "bucket": "CRITCHANCE",
+          "value": 0.1
+        },
+        {
+          "bucket": "GEM",
+          "value": 0.24
+        }
+      ],
+      "weaponTypeId": "1h_mace"
+    },
+    {
+      "id": "wep2",
+      "name": "Weapon 2",
+      "affixes": [
+        {
+          "bucket": "MAINSTAT",
+          "value": 210
+        },
+        {
+          "bucket": "CRITCHANCE",
+          "value": 0.075
+        },
+        {
+          "bucket": "MAINSTAT",
+          "value": 60
+        }
+      ],
+      "weaponTypeId": "shield"
+    },
+    {
+      "id": "wep3",
+      "name": "Weapon 3 (Rogue/Barb)",
+      "weaponTypeId": "none",
+      "affixes": []
+    },
+    {
+      "id": "wep4",
+      "name": "Weapon 4 (Barb)",
+      "weaponTypeId": "none",
+      "affixes": []
+    }
+  ],
+  "extraMultipliers": [
+    {
+      "label": "Heir of Perdition",
+      "value": 0.8
+    },
+    {
+      "label": "Lagera's Sovereignty",
+      "value": 0.56
+    },
+    {
+      "label": "Herald's Morningstar",
+      "value": 0.98
+    },
+    {
+      "label": "Argent Veil",
+      "value": 0.13
+    },
+    {
+      "label": "Ring of Starless Skies",
+      "value": 0.5
+    },
+    {
+      "label": "Herald of Zakarum",
+      "value": 0.3
+    }
+  ],
+  "snapshot": null
+}
