@@ -691,13 +691,20 @@ function buildPluggedIn(): HTMLElement {
   wrap.append(tbl);
 
   // Equation with substituted decimals (order matches the formula left-to-right)
+  // Compute the equation result from the rounded factors, so what's printed actually equals what's shown.
+  const r2 = (n: number) => Math.round(n * 100) / 100;
   let eq: string;
   if (isDot) {
-    eq = String.raw`D_{dot} = ${dec(c.weaponDmg)} \cdot ${dec(1 + additive)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.extraMultProduct)} \cdot ${dec(c.dotm)} \cdot ${dec(c.allm)} \cdot ${dec(1 - build.enemyDamageFactor)} = ${dec(dotDmg)}`;
+    const factors = [c.weaponDmg, 1 + additive, c.mainStatMult, c.skillCoef, c.extraMultProduct, c.dotm, c.allm, build.enemyDamageFactor].map(r2);
+    const result = factors.reduce((p, x) => p * x, 1);
+    eq = String.raw`D_{dot} = ${factors.map(f => dec(f)).join(' \cdot ')} = ${dec(result)}`;
   } else {
-    const critPart = String.raw` \cdot ${dec(c.csdm * 1.5)}`;
-    const vulnPart = conds.vulnerable ? String.raw` \cdot ${dec(vdmFactor)}` : '';
-    eq = String.raw`D_{crit} = ${dec(c.weaponDmg)} \cdot ${dec(1 + additive + critAdd)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.extraMultProduct)}${critPart}${vulnPart} \cdot ${dec(c.allm)} \cdot ${dec(1 - build.enemyDamageFactor)} = ${dec(critDmg)}`;
+    const factors = [c.weaponDmg, 1 + additive + critAdd, c.mainStatMult, c.skillCoef, c.extraMultProduct, c.csdm * 1.5];
+    if (conds.vulnerable) factors.push(vdmFactor);
+    factors.push(c.allm, build.enemyDamageFactor);
+    const rounded = factors.map(r2);
+    const result = rounded.reduce((p, x) => p * x, 1);
+    eq = String.raw`D_{crit} = ${rounded.map(f => dec(f)).join(' \cdot ')} = ${dec(result)}`;
   }
   wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(eq)));
 
