@@ -7,7 +7,7 @@
 //
 // The spreadsheet also bakes the 20% vulnerable baseline into its VDM bucket and
 // expects you to "always be vulnerable". Our calc separates the 1.2 baseline and only
-// applies it for vulnerable scenarios. So we set enemyDR = 0.2 (matching) and target
+// applies it for vulnerable scenarios. So we set enemyDamageFactor = 0.2 (matching, this is (1-R) where R=0.8) and target
 // a non-vulnerable scenario, then add 0.2 multiplier manually as part of expected.
 //
 // Usage: `npx tsx src/calc.test.ts` — exits 0 on pass, 1 on fail.
@@ -30,7 +30,7 @@ function makeReferencePaladin(): Build {
     skillDamagePct: 0.45,    // rank-1 base; calc applies step formula at totalSkillRanks=29 to get 1.8225
     totalSkillRanks: 29,
     baseCritChance: 1.0,         // overcapped in example
-    enemyDR: 0.2,
+    enemyDamageFactor: 0.2,
     disableCrit: false,
     additiveLines: DEFAULT_BUILD.additiveLines.map(l => ({ ...l })),
     extraAdditive: [],

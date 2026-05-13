@@ -92,7 +92,7 @@ function serialToBuild(j: any): Build {
     attackSpeedBonus: validNumber(j.attackSpeedBonus, 0),
     weaponSpeedOverride: j.weaponSpeedOverride == null ? null : validNumber(j.weaponSpeedOverride, 0),
     disableCrit: !!j.disableCrit,
-    enemyDR: validNumber(j.enemyDR, 0.2),
+    enemyDamageFactor: validNumber(j.enemyDamageFactor, 0.2),
     slots: migrateSlotsAndExtras(j),
     additiveLines: rehydrateLines(Array.isArray(j.additiveLines) ? j.additiveLines : undefined),
     snapshot: j.snapshot ? safeSerialToBuild(j.snapshot) : null,

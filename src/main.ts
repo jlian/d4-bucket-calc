@@ -629,7 +629,7 @@ function buildPluggedIn(): HTMLElement {
   const additive = additiveForScenario(build, isDot ? {} : conds);
   const critAdd = critOnlyAdditive(build);
   const vdmFactor = conds.vulnerable && !isDot ? c.vdm * 1.2 : 1;
-  const base = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * build.enemyDR;
+  const base = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * build.enemyDamageFactor;
   const nonCritDmg = base * (1 + additive);
   const critDmg = base * (1 + additive + critAdd) * c.csdm * 1.5;
   const dotDmg = base * (1 + additive) * c.dotm;
@@ -676,7 +676,7 @@ function buildPluggedIn(): HTMLElement {
     rows.push([String.raw`M_{dot}^d`, 'Damage Over Time Multiplier bucket. Active only on DoT ticks (d = 1).', dotmMath, c.dotm]);
   }
   rows.push(['M_{all}',          'All / Element Damage Multiplier bucket. Includes weapon gem damage which sums into this bucket.', allmMath, c.allm]);
-  rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy (80% reduction).`, `1 - 0.80`, 1 - build.enemyDR]);
+  rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy (80% reduction).`, `1 - 0.80`, 1 - build.enemyDamageFactor]);
 
   const tb = el('tbody');
   for (const [sym, desc, math, val] of rows) {
@@ -693,11 +693,11 @@ function buildPluggedIn(): HTMLElement {
   // Equation with substituted decimals (order matches the formula left-to-right)
   let eq: string;
   if (isDot) {
-    eq = String.raw`D_{dot} = ${dec(c.weaponDmg)} \cdot ${dec(1 + additive)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.extraMultProduct)} \cdot ${dec(c.dotm)} \cdot ${dec(c.allm)} \cdot ${dec(1 - build.enemyDR)} = ${dec(dotDmg)}`;
+    eq = String.raw`D_{dot} = ${dec(c.weaponDmg)} \cdot ${dec(1 + additive)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.extraMultProduct)} \cdot ${dec(c.dotm)} \cdot ${dec(c.allm)} \cdot ${dec(1 - build.enemyDamageFactor)} = ${dec(dotDmg)}`;
   } else {
     const critPart = String.raw` \cdot ${dec(c.csdm * 1.5)}`;
     const vulnPart = conds.vulnerable ? String.raw` \cdot ${dec(vdmFactor)}` : '';
-    eq = String.raw`D_{crit} = ${dec(c.weaponDmg)} \cdot ${dec(1 + additive + critAdd)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.extraMultProduct)}${critPart}${vulnPart} \cdot ${dec(c.allm)} \cdot ${dec(1 - build.enemyDR)} = ${dec(critDmg)}`;
+    eq = String.raw`D_{crit} = ${dec(c.weaponDmg)} \cdot ${dec(1 + additive + critAdd)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.extraMultProduct)}${critPart}${vulnPart} \cdot ${dec(c.allm)} \cdot ${dec(1 - build.enemyDamageFactor)} = ${dec(critDmg)}`;
   }
   wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(eq)));
 

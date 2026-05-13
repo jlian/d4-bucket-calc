@@ -163,7 +163,7 @@ export interface Build {
   attackSpeedBonus: number;
   weaponSpeedOverride: number | null;
   disableCrit: boolean;
-  enemyDR: number;
+  enemyDamageFactor: number;
   slots: Slot[];
   snapshot?: Build | null;
 }
@@ -180,7 +180,7 @@ export const DEFAULT_BUILD: Build = {
   attackSpeedBonus: 0,
   weaponSpeedOverride: null,
   disableCrit: false,
-  enemyDR: 0.2,
+  enemyDamageFactor: 0.2,
   slots: structuredClone(DEFAULT_SLOTS),
   snapshot: null,
 };
@@ -309,7 +309,7 @@ export function scenarioDamage(b: Build, scenario: Scenario): number {
   // Vuln baseline 20% AND VDM bucket only apply when target is vulnerable
   const vdmFactor = scenario.conditions.vulnerable ? c.vdm * 1.2 : 1;
 
-  const baseFactors = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * b.enemyDR;
+  const baseFactors = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * b.enemyDamageFactor;
 
   if (scenario.isDot) return baseFactors * (1 + baseAdd) * c.dotm;
 
