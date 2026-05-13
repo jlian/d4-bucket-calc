@@ -265,7 +265,7 @@ export interface Scenario {
 }
 
 // Compute additive bucket value for a scenario (including extraAdditive + slot ADDITIVE/GEM + applicable lines)
-function additiveForScenario(b: Build, conditions: ScenarioConditions): number {
+export function additiveForScenario(b: Build, conditions: ScenarioConditions): number {
   // Always-on/conditional applicable lines (excluding crit-only — handled separately)
   let add = 0;
   for (const l of b.additiveLines) {
@@ -277,7 +277,7 @@ function additiveForScenario(b: Build, conditions: ScenarioConditions): number {
   return add;
 }
 
-function critOnlyAdditive(b: Build): number {
+export function critOnlyAdditive(b: Build): number {
   // CRITADD bucket from gear + Critical Strike Damage line from naked baseline
   let add = sumAffixes(b.slots, 'CRITADD');
   for (const l of b.additiveLines) if (l.isCritOnly) add += l.value;

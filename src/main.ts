@@ -4,6 +4,7 @@ import katex from 'katex';
 import {
   calc, classFor, CLASSES, BUCKET_META, BUCKET_ORDER,
   weightFor, scenarioDamage, scenarioDamageNoCrit, presetScenarios,
+  additiveForScenario, critOnlyAdditive,
   WEAPON_TYPES,
   type Build, type Bucket, type Slot,
 } from './calc';
@@ -560,6 +561,9 @@ function formulaCard() {
   const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (\text{CSDM} \cdot 1.5)^{c} \cdot (\text{VDM} \cdot 1.2)^{v} \cdot \text{DOTM}^{d} \cdot (1 - R)`;
   card.append(el('div', { class: 'my-4 flex justify-center overflow-x-auto' }, katexBlock(formula)));
 
+  // Worked example with the user's current build values
+  card.append(workedExampleCard());
+
   // Variable list
   const varTable = el('table', { class: 'w-full text-xs my-3' });
   const varRows: [string, string][] = [
@@ -602,6 +606,98 @@ function formulaCard() {
   ));
 
   return card;
+}
+
+function workedExampleCard(): HTMLElement {
+  const wrap = el('div', { class: 'my-4 bg-zinc-950 border border-zinc-800 rounded p-4' });
+  wrap.append(el('h3', { class: 'text-sm font-semibold text-amber-400 mb-2' }, '✨ Your build, plugged in'));
+  const c = calc(build);
+  if (c.weaponDmg === 0) {
+    wrap.append(el('p', { class: 'text-xs text-zinc-500' }, 'Pick a weapon type to see the formula with your numbers.'));
+    return wrap;
+  }
+
+  const cls = classFor(build);
+  // Use the "vs Vulnerable Elite" scenario by default, or DoT if disabled
+  const scenario = build.disableCrit
+    ? presetScenarios().find(s => s.id === 'dot')!
+    : presetScenarios().find(s => s.id === 'vuln_elite')!;
+  const conds = scenario.conditions;
+  const additive = additiveForScenario(build, conds);
+  const critAdd = critOnlyAdditive(build);
+
+  // Effective factors (matching scenarioDamage logic)
+  const vdmFactor = conds.vulnerable ? c.vdm * 1.2 : 1;
+  // recompute precisely the same way as calc to keep numbers honest
+  const base = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * build.enemyDR;
+  const nonCritDmg = base * (1 + additive);
+  const critDmg = base * (1 + additive + critAdd) * c.csdm * 1.5;
+  const avgDmg = scenario.isDot
+    ? base * (1 + additive) * c.dotm
+    : critDmg * c.critChance + nonCritDmg * (1 - c.critChance);
+
+  const num = (n: number, d=2) => n.toLocaleString('en-US', { maximumFractionDigits: d });
+  const fmtMult = (n: number) => `×${num(n, 3)}`;
+
+  wrap.append(el('p', { class: 'text-xs text-zinc-500 mb-3' },
+    `Scenario: “${scenario.label}” · ${conds.vulnerable ? 'enemy is vulnerable, ' : ''}${conds.elites ? 'enemy is elite, ' : ''}${scenario.isDot ? 'DoT tick' : `${(c.critChance*100).toFixed(0)}% crit chance`}.`,
+  ));
+
+  // Step-by-step table
+  const tbl = el('table', { class: 'w-full text-xs' });
+  const addRow = (label: string, value: string, hl?: boolean) =>
+    tbl.append(el('tr', { class: 'border-b border-zinc-900' },
+      el('td', { class: 'py-1 pr-3 ' + (hl ? 'text-amber-400 font-semibold' : 'text-zinc-400') }, label),
+      el('td', { class: 'py-1 text-right tabular-nums font-mono ' + (hl ? 'text-amber-400 font-semibold' : 'text-zinc-300') }, value),
+    ));
+
+  addRow('Weapon Damage (W)', num(c.weaponDmg));
+  addRow(`Main Stat (${cls.mainStat}, S)`, `${c.mainStatSum} → 1 + ${c.mainStatSum}/${cls.divisor} = ${fmtMult(c.mainStatMult)}`);
+  addRow('Additive bucket (1 + A)', `1 + ${num(additive, 3)} = ${fmtMult(1 + additive)}`);
+  if (!scenario.isDot) addRow('Crit-only additive (CRITADD)', critAdd ? `+${num(critAdd,3)}` : '0');
+  addRow('All / Element Mult (ALLM)', fmtMult(c.allm));
+  addRow('Vulnerable Mult (VDM)', conds.vulnerable
+    ? `${fmtMult(c.vdm)} × 1.20 baseline = ${fmtMult(vdmFactor)}`
+    : 'inactive (target not vulnerable)');
+  if (scenario.isDot) {
+    addRow('DoT Mult (DOTM)', fmtMult(c.dotm));
+  } else {
+    addRow('Crit Mult (CSDM × 1.5)', `${fmtMult(c.csdm)} × 1.5 = ${fmtMult(c.csdm * 1.5)} (on crit)`);
+  }
+  addRow('Skill Coefficient (C)', `${num(c.skillCoef, 4)} (rank-1 ${num(build.skillCoefL1, 3)} × ${c.totalSkillRanks} ranks)`);
+  addRow('Standalone mults ∏Mi', fmtMult(c.extraMultProduct));
+  addRow('Enemy DR (1 - R)', `${num(build.enemyDR, 2)} (${num((1-build.enemyDR)*100, 0)}% reduction)`);
+  if (!scenario.isDot) {
+    addRow('Non-crit hit', num(nonCritDmg, 0));
+    addRow('Crit hit', num(critDmg, 0));
+    addRow(`Crit chance weighting`, `${(c.critChance*100).toFixed(1)}% crit, ${((1-c.critChance)*100).toFixed(1)}% non-crit`);
+  }
+  wrap.append(tbl);
+
+  // Final readout
+  wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
+    el('span', { class: 'text-sm text-zinc-300' }, scenario.isDot ? 'DoT tick damage' : 'Average damage per hit'),
+    el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(avgDmg)),
+  ));
+
+  // KaTeX rendered formula with substituted values
+  const ms = (1 + c.mainStatSum/cls.divisor).toFixed(3);
+  const partA = String.raw`D = ${num(c.weaponDmg)} \cdot (1 + ${num(additive,3)}) \cdot ${ms} \cdot ${num(c.skillCoef,4)} \cdot ${num(c.extraMultProduct,3)}`;
+  let partB = '';
+  if (!scenario.isDot) {
+    partB = String.raw` \cdot ${num(c.csdm,3)} \cdot 1.5`;
+    if (conds.vulnerable) partB += String.raw` \cdot ${num(c.vdm,3)} \cdot 1.2`;
+  } else {
+    partB = String.raw` \cdot ${num(c.dotm,3)}`;
+  }
+  partB += String.raw` \cdot ${num(c.allm,3)} \cdot ${num(build.enemyDR,2)}`;
+  wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(partA + partB)));
+
+  // Note about ignored variables
+  wrap.append(el('p', { class: 'text-xs text-zinc-600 mt-2 italic' },
+    'Note: factors that don\u2019t apply to this scenario (e.g. crit on a non-crit hit, DoT mult on a direct hit) are omitted.',
+  ));
+  return wrap;
 }
 
 function katexInline(tex: string): HTMLElement {
