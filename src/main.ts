@@ -676,7 +676,7 @@ function buildPluggedIn(): HTMLElement {
     rows.push([String.raw`M_{dot}^d`, 'Damage Over Time Multiplier bucket. Active only on DoT ticks (d = 1).', dotmMath, c.dotm]);
   }
   rows.push(['M_{all}',          'All / Element Damage Multiplier bucket. Includes weapon gem damage which sums into this bucket.', allmMath, c.allm]);
-  rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy (80% reduction).`, `1 - 0.80`, 1 - build.enemyDamageFactor]);
+  rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy (80% reduction).`, `1 - 0.80`, build.enemyDamageFactor]);
 
   const tb = el('tbody');
   for (const [sym, desc, math, val] of rows) {
@@ -690,25 +690,10 @@ function buildPluggedIn(): HTMLElement {
   tbl.append(tb);
   wrap.append(tbl);
 
-  // Equation with substituted decimals (order matches the formula left-to-right)
-  // Compute the equation result from the rounded factors, so what's printed actually equals what's shown.
-  const r2 = (n: number) => Math.round(n * 100) / 100;
-  let eq: string;
-  if (isDot) {
-    const factors = [c.weaponDmg, 1 + additive, c.mainStatMult, c.skillCoef, c.extraMultProduct, c.dotm, c.allm, build.enemyDamageFactor].map(r2);
-    const result = factors.reduce((p, x) => p * x, 1);
-    eq = String.raw`D_{dot} = ${factors.map(f => dec(f)).join(' \cdot ')} = ${dec(result)}`;
-  } else {
-    const factors = [c.weaponDmg, 1 + additive + critAdd, c.mainStatMult, c.skillCoef, c.extraMultProduct, c.csdm * 1.5];
-    if (conds.vulnerable) factors.push(vdmFactor);
-    factors.push(c.allm, build.enemyDamageFactor);
-    const rounded = factors.map(r2);
-    const result = rounded.reduce((p, x) => p * x, 1);
-    eq = String.raw`D_{crit} = ${rounded.map(f => dec(f)).join(' \cdot ')} = ${dec(result)}`;
-  }
-  wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(eq)));
-
-  // Big result
+  // (Dropped the substituted equation walk-through. Rounding to 2 decimals across 9+ factors
+  // accumulates ~0.5% drift, which made the printed result not match a calculator. The precise
+  // value below is from internal full-precision math.)
+  // Big result (precise, from internal full-precision math)
   wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
     el('span', { class: 'text-sm text-zinc-300' }, isDot ? 'DoT tick' : `Crit hit damage`),
     el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(isDot ? dotDmg : critDmg)),
