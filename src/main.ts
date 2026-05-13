@@ -509,7 +509,7 @@ function formulaCard() {
 
   // Main formula — use plain symbols, not in-build jargon
   const divisor = classFor(build).divisor;
-  const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (M_{crit} \cdot 1.5)^{c} \cdot (M_{vuln} \cdot 1.2)^{v} \cdot M_{dot}^{d} \cdot M_{all} \cdot (1 - R)`;
+  const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (1.5 \cdot M_{crit})^{c} \cdot (1.2 \cdot M_{vuln})^{v} \cdot M_{dot}^{d} \cdot M_{all} \cdot (1 - R)`;
   card.append(el('div', { class: 'my-4 flex justify-center overflow-x-auto' }, katexBlock(formula)));
 
   // Min/max heuristic
@@ -559,51 +559,56 @@ function buildPluggedIn(): HTMLElement {
   const dotDmg = base * (1 + additive) * c.dotm;
   const avgDmg = isDot ? dotDmg : (critDmg * c.critChance + nonCritDmg * (1 - c.critChance));
 
-  const dec = (n: number, d=3) => n.toLocaleString('en-US', { maximumFractionDigits: d });
+  // Format numbers without comma thousand separators (math notation), with fixed decimals
+  const dec = (n: number, d = 2) => n.toFixed(d);
   const hi = (s: string) => `<span class="text-amber-400 font-mono">${s}</span>`;
 
-  // One table: Symbol matches the formula exactly | Description | Your value with the math
+  // One table: Symbol matches the formula exactly | Description (text) | math (intermediate) | result (decimal)
   const tbl = el('table', { class: 'w-full text-xs my-3' });
   tbl.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
-    el('th', { class: 'text-left py-1 font-normal w-24' }, 'Factor'),
+    el('th', { class: 'text-left py-1 font-normal w-32' }, 'Factor'),
     el('th', { class: 'text-left py-1 font-normal' }, 'Description'),
-    el('th', { class: 'text-right py-1 font-normal' }, 'Your value'),
+    el('th', { class: 'text-right py-1 font-normal whitespace-nowrap' }, 'Math'),
+    el('th', { class: 'text-right py-1 font-normal pl-3 whitespace-nowrap' }, 'Value'),
   )));
-  type Row = [string, string, string];
+  type Row = [string, string, string, number];
+  // Order matches the formula left-to-right
   const rows: Row[] = [
-    ['W',                       'avg weapon damage',                                                          dec(c.weaponDmg, 0)],
-    ['(1 + A)',                 `additive bucket (A = sum of all +% damage = ${dec(additive)})`,              `${dec(1 + additive)}`],
-    [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier (S = ${dec(c.mainStatSum, 0)})`,                 `${dec(c.mainStatMult)}`],
-    ['C',                       `skill damage % (rank-1 ${dec(build.skillDamagePct)} × step formula at ${c.totalSkillRanks} ranks)`, dec(c.skillCoef)],
-    ['M_{all}',                 'All / Element Damage Mult bucket (1 + sum)',                                  dec(c.allm)],
+    ['W',                       'avg weapon damage',                                                  '',                                            c.weaponDmg],
+    ['(1 + A)',                 'always-on additive damage bucket',                                  `1 + ${dec(additive)}`,                        1 + additive],
+    [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier`,                                        `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
+    ['C',                       `skill damage % at ${c.totalSkillRanks} ranks (rank-1 × step formula)`, `${dec(build.skillDamagePct)} × ${dec(c.skillCoef / Math.max(build.skillDamagePct, 1e-9))}`, c.skillCoef],
+    ['\prod_i M_i',             'product of standalone aspects/uniques',                            '',                                            c.extraMultProduct],
   ];
   if (!isDot) {
-    rows.push(['M_{crit} \cdot 1.5', `Crit Damage Mult bucket (= ${dec(c.csdm)}) × 1.5 inherent`, dec(c.csdm * 1.5)]);
-    if (conds.vulnerable) rows.push(['M_{vuln} \cdot 1.2', `Vuln Damage Mult bucket (= ${dec(c.vdm)}) × 1.2 inherent`, dec(vdmFactor)]);
+    rows.push(['(1.5 \cdot M_{crit})^c', `crit factor (c=1 if hit crits, else 0). Bucket sum = ${dec(c.csdm)}`, `1.5 × ${dec(c.csdm)}`, c.csdm * 1.5]);
+    rows.push(['(1.2 \cdot M_{vuln})^v', `vulnerable factor (v=1 if target is vulnerable, else 0). Bucket sum = ${dec(c.vdm)}`, conds.vulnerable ? `1.2 × ${dec(c.vdm)}` : 'inactive', vdmFactor]);
   } else {
-    rows.push(['M_{dot}', 'Damage Over Time Mult bucket', dec(c.dotm)]);
+    rows.push(['M_{dot}^d', 'damage over time factor (d=1 for DoT ticks)', '', c.dotm]);
   }
-  rows.push(['\prod M_i', `product of standalone aspects/uniques`,                            dec(c.extraMultProduct)]);
-  rows.push(['(1 - R)',  `enemy DR factor (R = ${dec(build.enemyDR, 2)} for level-appropriate enemy)`, dec(1 - build.enemyDR, 2)]);
+  rows.push(['M_{all}',          'All / Element Damage Mult bucket', `1 + ${dec(c.allm - 1)}`, c.allm]);
+  rows.push(['(1 - R)',          `enemy damage reduction (R = ${dec(build.enemyDR, 2)} for level-appropriate enemy)`, `1 - ${dec(build.enemyDR, 2)}`, 1 - build.enemyDR]);
 
   const tb = el('tbody');
-  for (const [sym, desc, val] of rows) {
+  for (const [sym, desc, math, val] of rows) {
     tb.append(el('tr', { class: 'border-b border-zinc-900 align-top' },
-      el('td', { class: 'py-1 pr-3 w-12' }, katexInline(sym)),
-      el('td', { class: 'py-1 text-zinc-400' }, desc),
-      el('td', { class: 'py-1 text-right font-mono text-amber-400 tabular-nums' }, val),
+      el('td', { class: 'py-1 pr-3 align-top' }, katexInline(sym)),
+      el('td', { class: 'py-1 text-zinc-400 align-top' }, desc),
+      el('td', { class: 'py-1 text-right text-zinc-500 font-mono tabular-nums whitespace-nowrap pl-2 align-top' }, math),
+      el('td', { class: 'py-1 text-right font-mono text-amber-400 tabular-nums whitespace-nowrap pl-3 align-top' }, dec(val, 2)),
     ));
   }
   tbl.append(tb);
   wrap.append(tbl);
 
-  // Equation with substituted decimals
+  // Equation with substituted decimals (order matches the formula left-to-right)
   let eq: string;
   if (isDot) {
-    eq = String.raw`D = ${dec(c.weaponDmg, 0)} \cdot ${dec(1 + additive)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.allm)} \cdot ${dec(c.dotm)} \cdot ${dec(c.extraMultProduct)} \cdot ${dec(1 - build.enemyDR, 2)} = ${dec(dotDmg, 0)}`;
+    eq = String.raw`D_{dot} = ${dec(c.weaponDmg)} \cdot ${dec(1 + additive)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.extraMultProduct)} \cdot ${dec(c.dotm)} \cdot ${dec(c.allm)} \cdot ${dec(1 - build.enemyDR)} = ${dec(dotDmg)}`;
   } else {
-    const vdmPart = conds.vulnerable ? String.raw` \cdot ${dec(vdmFactor)}` : '';
-    eq = String.raw`D_{crit} = ${dec(c.weaponDmg, 0)} \cdot ${dec(1 + additive + critAdd)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.allm)} \cdot ${dec(c.csdm * 1.5)}${vdmPart} \cdot ${dec(c.extraMultProduct)} \cdot ${dec(1 - build.enemyDR, 2)} = ${dec(critDmg, 0)}`;
+    const critPart = String.raw` \cdot ${dec(c.csdm * 1.5)}`;
+    const vulnPart = conds.vulnerable ? String.raw` \cdot ${dec(vdmFactor)}` : '';
+    eq = String.raw`D_{crit} = ${dec(c.weaponDmg)} \cdot ${dec(1 + additive + critAdd)} \cdot ${dec(c.mainStatMult)} \cdot ${dec(c.skillCoef)} \cdot ${dec(c.extraMultProduct)}${critPart}${vulnPart} \cdot ${dec(c.allm)} \cdot ${dec(1 - build.enemyDR)} = ${dec(critDmg)}`;
   }
   wrap.append(el('div', { class: 'mt-3 overflow-x-auto text-xs' }, katexBlock(eq)));
 
