@@ -594,6 +594,15 @@ function additiveBreakdownMath(b: Build, conds: any, includeCrit: boolean): stri
   return parts.length ? `1 + ${parts.join(' + ')}` : '';
 }
 
+function bucketBreakdownMath(b: Build, bucket: 'CSDM' | 'VDM' | 'DOTM' | 'ALLM'): string {
+  const parts: string[] = [];
+  for (const slot of b.slots) for (const aa of slot.affixes) {
+    if (aa.bucket === bucket && aa.value !== 0) parts.push(aa.value.toFixed(2));
+    if (bucket === 'ALLM' && (aa.bucket === 'NONPHYS' || aa.bucket === 'GEM') && aa.value !== 0) parts.push(aa.value.toFixed(2));
+  }
+  return parts.length ? `1 + ${parts.join(' + ')}` : '1';
+}
+
 function extraMultMath(b: Build): string {
   const factors: { label: string; v: number }[] = [];
   for (const slot of b.slots) for (const aa of slot.affixes) {
@@ -639,32 +648,35 @@ function buildPluggedIn(): HTMLElement {
     el('th', { class: 'text-right py-1 font-normal pl-3 whitespace-nowrap' }, 'Value'),
   )));
   type Row = [string, string, string, number];
-  // Order matches the formula left-to-right
-  // For non-DoT, A includes the +Crit Damage additive when on a crit hit.
-  // We always show the (1+A) row with the value used in the equation (crit-inclusive when applicable).
   const usedAdd = isDot ? additive : (additive + critAdd);
   const isCritContext = !isDot;
   const addMath = additiveBreakdownMath(build, conds, isCritContext);
-  const addDesc = isDot
-    ? 'always-on additive damage bucket'
-    : (critAdd > 0
-        ? `additive bucket on a crit (includes +${dec(critAdd)} from + Crit Damage affixes; non-crit hits use ${dec(1 + additive)} instead)`
-        : 'always-on additive damage bucket (no separate +Crit Damage affixes)');
+  // Skill coef step formula at N total ranks: base × (1 + 0.10 × (N - floor(N/5) - 1) + 0.15 × floor(N/5))
+  const N = c.totalSkillRanks;
+  const f = Math.floor(N / 5);
+  const skillStep = N > 0 ? 1 + 0.10 * (N - f - 1) + 0.15 * f : 1;
+  const skillMath = N > 0
+    ? `${dec(build.skillDamagePct)} × (1 + 0.10×(${N}-${f}-1) + 0.15×${f}) = ${dec(build.skillDamagePct)} × ${dec(skillStep)}`
+    : `${dec(build.skillDamagePct)} × 1`;
+  const csdmMath = bucketBreakdownMath(build, 'CSDM');
+  const vdmMath = bucketBreakdownMath(build, 'VDM');
+  const dotmMath = bucketBreakdownMath(build, 'DOTM');
+  const allmMath = bucketBreakdownMath(build, 'ALLM');
   const rows: Row[] = [
-    ['W',                       'avg weapon damage',                                                  '',                                            c.weaponDmg],
-    ['(1 + A)',                 addDesc,                                                              addMath || `1 + ${dec(usedAdd)}`,             1 + usedAdd],
-    [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier`,                                        `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
-    ['C',                       `skill damage % at ${c.totalSkillRanks} ranks (rank-1 × step formula)`, `${dec(build.skillDamagePct)} × ${dec(c.skillCoef / Math.max(build.skillDamagePct, 1e-9))}`, c.skillCoef],
-    [String.raw`\prod_i M_i`,    'product of standalone aspects/uniques',                            extraMultMath(build),                          c.extraMultProduct],
+    ['W',                       'Average weapon damage from your equipped weapon(s).',                                        '',                                            c.weaponDmg],
+    ['(1 + A)',                 isDot ? 'Sum of all additive damage % bonuses (the giant pool).' : (critAdd > 0 ? 'Additive damage bucket. On a crit, includes the +Crit Damage additive too; non-crit hits use just the base bucket.' : 'Sum of all additive damage % bonuses.'), addMath || `1 + ${dec(usedAdd)}`, 1 + usedAdd],
+    [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier. Divisor is ${cls.divisor} for ${build.classId} (Barbarian uses 900, all others 800).`, `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
+    ['C',                       'Skill damage coefficient. Step formula: base × (1 + 0.10·(N - ⌊N/5⌋ - 1) + 0.15·⌊N/5⌋) where N = total ranks. Every multiple of 5 ranks gets a 5% bonus on top.', skillMath, c.skillCoef],
+    [String.raw`\prod_i M_i`,    'Product of standalone aspect/unique multipliers. Each one is its own factor.', extraMultMath(build), c.extraMultProduct],
   ];
   if (!isDot) {
-    rows.push([String.raw`(1.5 \cdot M_{crit})^c`, `crit factor (c=1 if hit crits, else 0). Bucket sum = ${dec(c.csdm)}`, `1.5 × ${dec(c.csdm)}`, c.csdm * 1.5]);
-    rows.push([String.raw`(1.2 \cdot M_{vuln})^v`, `vulnerable factor (v=1 if target is vulnerable, else 0). Bucket sum = ${dec(c.vdm)}`, conds.vulnerable ? `1.2 × ${dec(c.vdm)}` : 'inactive (v = 0)', vdmFactor]);
+    rows.push([String.raw`(1.5 \cdot M_{crit})^c`, 'Crit factor: 1.5 inherent crit baseline times the Critical Strike Damage Multiplier bucket. Active only on crit hits (c = 1).', `1.5 × (${csdmMath})`, c.csdm * 1.5]);
+    rows.push([String.raw`(1.2 \cdot M_{vuln})^v`, 'Vulnerable factor: 1.2 inherent vuln baseline times the Vulnerable Damage Multiplier bucket. Active only against vulnerable targets (v = 1).', conds.vulnerable ? `1.2 × (${vdmMath})` : 'inactive (v = 0)', vdmFactor]);
   } else {
-    rows.push([String.raw`M_{dot}^d`, 'damage over time factor (d=1 for DoT ticks)', '', c.dotm]);
+    rows.push([String.raw`M_{dot}^d`, 'Damage Over Time Multiplier bucket. Active only on DoT ticks (d = 1).', dotmMath, c.dotm]);
   }
-  rows.push(['M_{all}',          'All / Element Damage Mult bucket', `1 + ${dec(c.allm - 1)}`, c.allm]);
-  rows.push(['(1 - R)',          `enemy damage reduction (R = ${dec(build.enemyDR, 2)} for level-appropriate enemy)`, `1 - ${dec(build.enemyDR, 2)}`, 1 - build.enemyDR]);
+  rows.push(['M_{all}',          'All / Element Damage Multiplier bucket. Includes weapon gem damage which sums into this bucket.', allmMath, c.allm]);
+  rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy.`, `1 - ${dec(build.enemyDR, 2)}`, 1 - build.enemyDR]);
 
   const tb = el('tbody');
   for (const [sym, desc, math, val] of rows) {
