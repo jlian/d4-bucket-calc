@@ -676,7 +676,7 @@ function buildPluggedIn(): HTMLElement {
     rows.push([String.raw`M_{dot}^d`, 'Damage Over Time Multiplier bucket. Active only on DoT ticks (d = 1).', dotmMath, c.dotm]);
   }
   rows.push(['M_{all}',          'All / Element Damage Multiplier bucket. Includes weapon gem damage which sums into this bucket.', allmMath, c.allm]);
-  rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy.`, `1 - ${dec(build.enemyDR, 2)}`, 1 - build.enemyDR]);
+  rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy (80% reduction).`, `1 - 0.80`, 1 - build.enemyDR]);
 
   const tb = el('tbody');
   for (const [sym, desc, math, val] of rows) {
