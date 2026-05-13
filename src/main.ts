@@ -107,18 +107,24 @@ function mount() {
   persist(build);
 
   // Footer
-  const footer = el('footer', { class: 'max-w-6xl mx-auto p-4 mt-8 border-t border-zinc-900' });
+  const footer = el('footer', { id: 'formula-footer', class: 'max-w-6xl mx-auto p-4 mt-8 border-t border-zinc-900' });
   footer.append(formulaCard());
   root.append(footer);
 }
 
 function refreshOutputs() {
   const right = document.getElementById('outputs');
-  if (!right) return;
-  right.innerHTML = '';
-  right.append(scenariosCard());
-  right.append(bucketsCard());
-  right.append(statsCard());
+  if (right) {
+    right.innerHTML = '';
+    right.append(scenariosCard());
+    right.append(bucketsCard());
+    right.append(statsCard());
+  }
+  const footer = document.getElementById('formula-footer');
+  if (footer) {
+    footer.innerHTML = '';
+    footer.append(formulaCard());
+  }
 }
 
 // ---------- Header ----------
@@ -209,6 +215,27 @@ function nakedBaselineCard() {
     grid.append(row);
   }
   card.append(grid);
+
+  // Custom additive entries (free-form): for things not in the standard list (paragon legendary additive nodes, set bonuses listed as additive, etc.)
+  card.append(el('h4', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-4 mb-2' }, 'Custom additive (always-on)'));
+  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'Free-form additive entries that go into the additive bucket. Useful for paragon legendary nodes that grant additive damage, set bonuses with +X% damage, etc.'));
+  const paragonSlot = build.slots.find(s => s.id === 'paragon');
+  if (paragonSlot) {
+    const customAdds = paragonSlot.affixes.filter(a => a.bucket === 'ADDITIVE');
+    customAdds.forEach((a) => {
+      const row = el('div', { class: 'flex items-center gap-2 mb-1.5' });
+      row.append(textInput(() => a.label ?? '', v => { a.label = v; }, { w: 'flex-1', placeholder: 'Label (e.g. “Extra paragon damage”)' }));
+      row.append(pctInput(() => a.value, v => a.value = v, { w: 'w-24' }));
+      row.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
+      const del = el('button', { class: 'text-zinc-500 hover:text-red-400 px-2' }, '✕');
+      del.addEventListener('click', () => { paragonSlot.affixes.splice(paragonSlot.affixes.indexOf(a), 1); mount(); });
+      row.append(del);
+      card.append(row);
+    });
+    const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-1 rounded border border-amber-700/50 mt-1' }, '+ Add custom additive');
+    addBtn.addEventListener('click', () => { paragonSlot.affixes.push({ bucket: 'ADDITIVE' as Bucket, value: 0, label: '' }); mount(); });
+    card.append(addBtn);
+  }
   return card;
 }
 
@@ -537,7 +564,9 @@ function formulaCard() {
   return card;
 }
 
+// @ts-ignore unused
 function additiveBreakdown(b: Build, conds: any): string {
+  // Kept for backward compat; description-only short version
   const parts: string[] = [];
   for (const l of b.additiveLines) {
     if (l.isCritOnly) continue;
@@ -547,6 +576,50 @@ function additiveBreakdown(b: Build, conds: any): string {
   for (const slot of b.slots) for (const aa of slot.affixes) if (aa.bucket === 'ADDITIVE') slotAdd += aa.value;
   if (slotAdd > 0) parts.push(`gear/extras ${(slotAdd*100).toFixed(1)}%`);
   return parts.length ? ` — sum of ${parts.join(', ')}` : '';
+}
+
+function additiveBreakdownMath(b: Build, conds: any): string {
+  const parts: string[] = [];
+  for (const l of b.additiveLines) {
+    if (l.isCritOnly) continue;
+    if (l.applies(conds) && l.value > 0) parts.push(l.value.toFixed(2));
+  }
+  let slotAdd = 0;
+  for (const slot of b.slots) for (const aa of slot.affixes) if (aa.bucket === 'ADDITIVE') slotAdd += aa.value;
+  if (slotAdd > 0) parts.push(slotAdd.toFixed(2));
+  return parts.length ? `1 + ${parts.join(' + ')}` : '';
+}
+
+function additiveCritBreakdownMath(b: Build, conds: any): string {
+  // Same as above but also include crit-only lines + CRITADD affixes
+  const parts: string[] = [];
+  for (const l of b.additiveLines) {
+    if (l.applies(conds) && l.value > 0) parts.push(l.value.toFixed(2));
+  }
+  let slotAdd = 0, slotCritAdd = 0;
+  for (const slot of b.slots) for (const aa of slot.affixes) {
+    if (aa.bucket === 'ADDITIVE') slotAdd += aa.value;
+    if (aa.bucket === 'CRITADD') slotCritAdd += aa.value;
+  }
+  if (slotAdd > 0) parts.push(slotAdd.toFixed(2));
+  if (slotCritAdd > 0) parts.push(slotCritAdd.toFixed(2));
+  // include the naked 'crit' additive line via critOnly
+  for (const l of b.additiveLines) if (l.isCritOnly && l.value > 0) {
+    // already included via .applies(conds) when crit; but the loop above only adds non-crit when conds.isCrit is false
+    // Force include it here to be safe
+    if (!parts.includes(l.value.toFixed(2))) parts.push(l.value.toFixed(2));
+  }
+  return parts.length ? `1 + ${parts.join(' + ')}` : '';
+}
+
+function extraMultMath(b: Build): string {
+  const factors: string[] = [];
+  for (const slot of b.slots) for (const aa of slot.affixes) {
+    if (aa.bucket === 'EXTRAMULT' && aa.value !== 0) factors.push((1 + aa.value).toFixed(2));
+  }
+  if (factors.length === 0) return '';
+  if (factors.length > 6) return `${factors.length} factors multiplied`;
+  return factors.join(' × ');
 }
 
 function buildPluggedIn(): HTMLElement {
@@ -585,15 +658,22 @@ function buildPluggedIn(): HTMLElement {
   )));
   type Row = [string, string, string, number];
   // Order matches the formula left-to-right
+  const addBreakdownMath = additiveBreakdownMath(build, conds);
+  const addCritBreakdownMath = isDot ? '' : additiveCritBreakdownMath(build, conds);
   const rows: Row[] = [
     ['W',                       'avg weapon damage',                                                  '',                                            c.weaponDmg],
-    ['(1 + A)',                 `always-on additive damage bucket${additiveBreakdown(build, conds)}`,                                  `1 + ${dec(additive)}`,                        1 + additive],
+    ['(1 + A)',                 isDot ? 'always-on additive damage bucket' : 'always-on additive damage bucket (used for non-crit hits)',   addBreakdownMath || `1 + ${dec(additive)}`,                        1 + additive],
+  ];
+  if (!isDot && critAdd > 0) {
+    rows.push(['(1 + A + CRITADD)', `additive bucket on a crit (CRITADD = +${dec(critAdd)} from + Crit Damage affixes)`, addCritBreakdownMath || `1 + ${dec(additive)} + ${dec(critAdd)}`, 1 + additive + critAdd]);
+  }
+  rows.push(
     [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier`,                                        `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
     ['C',                       `skill damage % at ${c.totalSkillRanks} ranks (rank-1 × step formula)`, `${dec(build.skillDamagePct)} × ${dec(c.skillCoef / Math.max(build.skillDamagePct, 1e-9))}`, c.skillCoef],
-    [String.raw`\prod_i M_i`,    'product of standalone aspects/uniques',                            '',                                            c.extraMultProduct],
-  ];
+    [String.raw`\prod_i M_i`,    'product of standalone aspects/uniques',                            extraMultMath(build),                          c.extraMultProduct],
+  );
   if (!isDot) {
-    rows.push([String.raw`(1.5 \cdot M_{crit})^c`, `crit factor (c=1 if hit crits, else 0). Bucket sum = ${dec(c.csdm)}. ${critAdd > 0 ? `On crit, +${(critAdd*100).toFixed(0)}% extra additive (CRITADD).` : ''}`, `1.5 × ${dec(c.csdm)}`, c.csdm * 1.5]);
+    rows.push([String.raw`(1.5 \cdot M_{crit})^c`, `crit factor (c=1 if hit crits, else 0). Bucket sum = ${dec(c.csdm)}`, `1.5 × ${dec(c.csdm)}`, c.csdm * 1.5]);
     rows.push([String.raw`(1.2 \cdot M_{vuln})^v`, `vulnerable factor (v=1 if target is vulnerable, else 0). Bucket sum = ${dec(c.vdm)}`, conds.vulnerable ? `1.2 × ${dec(c.vdm)}` : 'inactive (v = 0)', vdmFactor]);
   } else {
     rows.push([String.raw`M_{dot}^d`, 'damage over time factor (d=1 for DoT ticks)', '', c.dotm]);
