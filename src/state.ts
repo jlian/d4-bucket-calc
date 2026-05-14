@@ -146,6 +146,9 @@ export function importJson(text: string): Build | null {
     return serialToBuild(parsed);
   } catch { return null; }
 }
+export function importJsonObject(obj: any): Build | null {
+  return safeSerialToBuild(obj);
+}
 
 export function loadInitialBuild(): Build {
   const hash = window.location.hash.replace(/^#/, '');

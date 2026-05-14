@@ -1,14 +1,15 @@
 import './style.css';
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
+import samplePaladin from './sample-paladin.json';
 import {
   calc, classFor, CLASSES, BUCKET_META, BUCKET_ORDER,
   weightFor, scenarioDamage, scenarioDamageNoCrit, presetScenarios,
   additiveForScenario, critOnlyAdditive,
-  WEAPON_TYPES,
+  WEAPON_TYPES, weaponTypeById,
   type Build, type Bucket, type Slot,
 } from './calc';
-import { loadInitialBuild, persist, exportJson, importJson, cloneBuild, buildShareUrl } from './state';
+import { loadInitialBuild, persist, exportJson, importJson, cloneBuild, buildShareUrl, importJsonObject } from './state';
 
 let build: Build = loadInitialBuild();
 
@@ -144,7 +145,7 @@ function renderHeader() {
         ),
       ),
       el('div', { class: 'flex items-center gap-2 flex-wrap' },
-        snapshotBtn(), restoreSnapshotBtn(), jsonBtn(), copyShareBtn(), resetBtn(),
+        snapshotBtn(), restoreSnapshotBtn(), loadSampleBtn(), jsonBtn(), copyShareBtn(), resetBtn(),
       ),
     ),
   );
@@ -196,8 +197,30 @@ function classSkillCard() {
 
 // ---------- Card 2: Naked Baseline ----------
 function nakedBaselineCard() {
-  const card = sectionCard('Damage Stats (Naked Baseline)',
-    'Strip ALL gear including charms/seal. Open Character Sheet → Offensive tab. Hover each line and copy the BOTTOM tooltip number (“You have +X% of this stat from items and Paragon”). The inherent 50% crit and 20% vulnerable are baked into the formula — don’t add them. This captures all your paragon additive damage cleanly without any gear interference.');
+  const card = sectionCard('Damage Stats (Naked Baseline)');
+
+  // Replace the long single-paragraph subtitle with bullet steps + a reference screenshot
+  const help = el('details', { class: 'mb-3 text-xs text-zinc-400' });
+  const summary = el('summary', { class: 'cursor-pointer text-zinc-300 select-none' }, 'How to fill this in (read once, takes 2 min in-game)');
+  help.append(summary);
+  const body = el('div', { class: 'mt-2 grid sm:grid-cols-[1fr_auto] gap-3 items-start' });
+  const steps = el('ol', { class: 'list-decimal list-inside space-y-1 text-zinc-400' });
+  steps.append(
+    el('li', {}, 'Strip ', el('strong', { class: 'text-zinc-200' }, 'all'), ' gear (and charms / Horadric Seal). You want pure paragon contribution.'),
+    el('li', {}, 'Open Character Sheet → ', el('strong', { class: 'text-zinc-200' }, 'Offensive'), ' tab.'),
+    el('li', {}, 'Hover each line. The tooltip has a ', el('strong', { class: 'text-zinc-200' }, 'top'), ' (visible) number and a ', el('strong', { class: 'text-zinc-200' }, 'bottom'), ' line: ',
+      el('em', { class: 'text-amber-300' }, '“You have +X% of this stat from items and Paragon.”'),
+      ' Copy the bottom number.'),
+    el('li', {}, 'The inherent +50% crit damage and +20% vulnerable are already baked into the formula — don’t add them.'),
+  );
+  body.append(steps);
+  const fig = el('figure', { class: 'border border-zinc-800 rounded overflow-hidden bg-zinc-950 max-w-[320px]' });
+  const img = el('img', { src: import.meta.env.BASE_URL + 'help/offensive-tab-hover.webp', alt: 'D4 Offensive tab tooltip example', class: 'block w-full h-auto', loading: 'lazy' }) as HTMLImageElement;
+  fig.append(img);
+  fig.append(el('figcaption', { class: 'text-[10px] text-zinc-500 px-2 py-1' }, 'Hover a stat → read the bottom “+X% from items and Paragon” line.'));
+  body.append(fig);
+  help.append(body);
+  card.append(help);
 
   const critRow = el('div', { class: 'mb-3 flex items-center gap-2' });
   critRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Critical Strike Chance'));
@@ -292,6 +315,18 @@ function paragonContributionsCard() {
 function slotBlock(slot: Slot) {
   const isWeapon = slot.id.startsWith('wep');
   const isParagon = slot.id === 'paragon';
+  const isEmpty = slot.affixes.length === 0 && (!isWeapon || (slot.weaponTypeId ?? 'none') === 'none');
+
+  // Collapsed row for empty non-weapon, non-paragon slots: just a thin label + add button.
+  if (isEmpty && !isWeapon && !isParagon) {
+    const row = el('div', { class: 'flex items-center justify-between gap-3 py-1.5 px-3 mb-1 border border-zinc-800/60 rounded text-sm hover:border-zinc-700 transition-colors' });
+    row.append(el('span', { class: 'text-zinc-500' }, slot.name));
+    const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-0.5 rounded border border-amber-700/50' }, '+ Add Affix');
+    addBtn.addEventListener('click', () => { slot.affixes.push({ bucket: 'CSDM', value: 0 }); mount(); });
+    row.append(addBtn);
+    return row;
+  }
+
   const wrap = el('div', { class: 'border border-zinc-800 rounded-lg p-3 mb-2' });
 
   const header = el('div', { class: 'flex items-center gap-3 mb-2 flex-wrap' });
@@ -306,8 +341,20 @@ function slotBlock(slot: Slot) {
       if (wt.id === (slot.weaponTypeId ?? 'none')) opt.setAttribute('selected', '');
       sel.append(opt);
     }
-    sel.addEventListener('change', () => { slot.weaponTypeId = sel.value; afterInput(); });
+    sel.addEventListener('change', () => { slot.weaponTypeId = sel.value; mount(); });
     header.append(sel);
+    const wt = weaponTypeById(slot.weaponTypeId ?? 'none');
+    if (wt.baseDamage > 0) {
+      const overrides = slot.affixes.filter(a => a.bucket === 'WEPDMG').reduce((s, a) => s + a.value, 0);
+      const total = wt.baseDamage + overrides;
+      const dmgChip = el('span', {
+        class: 'text-xs text-zinc-400 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 whitespace-nowrap',
+        title: overrides !== 0
+          ? `Base ${wt.baseDamage.toLocaleString()} + ${overrides >= 0 ? '+' : ''}${overrides.toLocaleString()} from + Weapon Damage affix(es) below`
+          : `Built-in baseline for ${wt.label}. Add a “+ Weapon Damage” affix below to override.`,
+      }, `${total.toLocaleString()} dmg`);
+      header.append(dmgChip);
+    }
   }
 
   const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-1 rounded border border-amber-700/50' }, '+ Add Affix');
@@ -413,9 +460,9 @@ function scenariosCard() {
 
   if (!build.disableCrit) {
     const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
-    card.append(el('div', { class: 'text-center text-xs text-zinc-500 mt-1' },
-      `avg @ ${(c.critChance*100).toFixed(1)}% crit → `,
-      el('span', { class: 'text-zinc-300 font-mono' }, fmtBigNum(avg)),
+    card.append(el('div', { class: 'text-center text-sm text-zinc-300 mt-1.5' },
+      el('span', { class: 'text-xs text-zinc-500' }, `avg @ ${(c.critChance*100).toFixed(1)}% crit → `),
+      el('span', { class: 'text-zinc-100 font-mono font-semibold' }, fmtBigNum(avg)),
     ));
   }
 
@@ -453,6 +500,17 @@ function bucketsCard() {
     card.append(el('p', { class: 'text-xs text-amber-400' }, '⚠️ Pick a weapon type to compute weights.'));
     return card;
   }
+
+  // "How buckets work" up top so first-time readers see it before the table of numbers.
+  card.append(el('details', { class: 'mb-3 text-xs text-zinc-500 border border-zinc-800/60 rounded p-2' },
+    el('summary', { class: 'cursor-pointer text-zinc-400 select-none' }, 'How buckets work (read once)'),
+    el('div', { class: 'mt-2 text-zinc-400 space-y-2' },
+      el('p', {}, 'Same-named affixes ', el('strong', {}, 'sum into one bucket'), '; the bucket then multiplies into the damage formula. A small bucket gains more from a new affix than a big one.'),
+      el('p', {}, 'Example: CSDM bucket at +150% (×2.50). Adding x10% → +160% (×2.60). Damage gain = 2.60 / 2.50 = +4%. If your Vulnerable bucket only had +20% (×1.20), same +10% affix goes to ×1.30 → +8.3% — twice as good.'),
+      el('p', {}, el('strong', {}, '+ vs x: '), '“+75% Crit Damage” joins the giant additive bucket. “x56% Crit Damage Multiplier” is its own much smaller bucket. The x version is usually 3-5× more valuable in late game.'),
+    ),
+  ));
+
   const refScenario = build.disableCrit
     ? presetScenarios().find(s => s.id === 'dot')!
     : { id: 'live', label: 'current scenario', conditions: { ...scenarioState } } as any;
@@ -488,15 +546,6 @@ function bucketsCard() {
   }
   table.append(tb);
   card.append(table);
-
-  card.append(el('details', { class: 'mt-3 text-xs text-zinc-500' },
-    el('summary', { class: 'cursor-pointer text-zinc-400' }, 'How buckets work'),
-    el('div', { class: 'mt-2 text-zinc-400 space-y-2' },
-      el('p', {}, 'Same-named affixes ', el('strong', {}, 'sum into one bucket'), '; the bucket then multiplies into the damage formula. A small bucket gains more from a new affix than a big one.'),
-      el('p', {}, 'Example: CSDM bucket at +150% (×2.50). Adding x10% → +160% (×2.60). Damage gain = 2.60 / 2.50 = +4%. If your Vulnerable bucket only had +20% (×1.20), same +10% affix goes to ×1.30 → +8.3% — twice as good.'),
-      el('p', {}, el('strong', {}, '+ vs x: '), '“+75% Crit Damage” joins the giant additive bucket. “x56% Crit Damage Multiplier” is its own much smaller bucket. The x version is usually 3-5× more valuable in late game.'),
-    ),
-  ));
 
   return card;
 }
@@ -767,6 +816,21 @@ function restoreSnapshotBtn() {
 function jsonBtn() {
   const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'View / edit / copy build JSON' }, '{ } JSON');
   btn.addEventListener('click', () => openJsonDialog());
+  return btn;
+}
+
+function loadSampleBtn() {
+  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Load a fully-populated sample build (Paladin / Blessed Hammer)' }, '✨ Sample build');
+  btn.addEventListener('click', () => {
+    const isEmpty = build.baseMainStat === 0 && build.skillDamagePct === 0
+      && build.slots.every(s => s.affixes.length === 0 && (s.weaponTypeId ?? 'none') === 'none');
+    if (!isEmpty && !confirm('Replace the current build with the sample? Your current build will be lost (Snapshot/Reset can recover it).')) return;
+    const parsed = importJsonObject(samplePaladin);
+    if (!parsed) { alert('Sample build failed to load. (Bug — please report.)'); return; }
+    build = parsed;
+    persist(build);
+    mount();
+  });
   return btn;
 }
 

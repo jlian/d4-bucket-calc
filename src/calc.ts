@@ -170,11 +170,11 @@ export interface Build {
 
 export const DEFAULT_BUILD: Build = {
   classId: 'Paladin',
-  baseMainStat: 800,
+  baseMainStat: 0,
   extraMainStat: 0,
   additiveLines: cloneDefaultLines(),
   skillName: 'Main Skill',
-  skillDamagePct: 0.45,
+  skillDamagePct: 0,
   totalSkillRanks: 5,
   baseCritChance: 0.05,
   attackSpeedBonus: 0,
