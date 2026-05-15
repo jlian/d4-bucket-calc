@@ -370,7 +370,12 @@ function slotBlock(slot: Slot) {
     const row = el('div', { class: 'flex flex-wrap sm:flex-nowrap gap-2 mb-1.5 items-center min-w-0' });
     const sel = el('select', { class: inputCls() + ' w-full sm:flex-1 min-w-0' }) as HTMLSelectElement;
     const candidates = BUCKET_ORDER.filter(b => isWeapon || (b !== 'WEPDMG' && b !== 'GEM'));
-    candidates.sort((x, y) => BUCKET_META[x].label.localeCompare(BUCKET_META[y].label));
+    const customBuckets = new Set(['ADDITIVE', 'EXTRAMULT']);
+    candidates.sort((x, y) => {
+      const xc = customBuckets.has(x), yc = customBuckets.has(y);
+      if (xc !== yc) return xc ? 1 : -1;
+      return BUCKET_META[x].label.localeCompare(BUCKET_META[y].label);
+    });
     for (const b of candidates) {
       const opt = el('option', { value: b }, BUCKET_META[b].label);
       if (b === a.bucket) opt.setAttribute('selected', '');
