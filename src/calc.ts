@@ -350,7 +350,7 @@ export const BUCKET_META: Record<Bucket, { label: string; isPercent: boolean; ty
   DOTM:         { label: 'x% Damage Over Time Multiplier',        isPercent: true,  typicalRoll: 0.10 },
   ALLM:         { label: 'x% All / Element Damage Multiplier',    isPercent: true,  typicalRoll: 0.10 },
   NONPHYS:      { label: 'x% Non-Physical Damage',                isPercent: true,  typicalRoll: 0.10 },
-  ADDITIVE:     { label: '+% Damage (additive bucket)',           isPercent: true,  typicalRoll: 0.10 },
+  ADDITIVE:     { label: 'Custom +% (additive bucket)',           isPercent: true,  typicalRoll: 0.10 },
   CRITADD:      { label: '+% Critical Strike Damage',             isPercent: true,  typicalRoll: 0.10 },
   MAINSTAT:     { label: '+ Main Stat (Str/Dex/Int/Will)',        isPercent: false, typicalRoll: 200 },
   MAINSTAT_PCT: { label: 'x% Main Stat Multiplier',               isPercent: true,  typicalRoll: 0.10 },
@@ -358,7 +358,7 @@ export const BUCKET_META: Record<Bucket, { label: string; isPercent: boolean; ty
   GEM:          { label: 'Weapon Gem (sums into All / Element)',  isPercent: true,  typicalRoll: 0.10 },
   CRITCHANCE:   { label: '+% Critical Strike Chance',             isPercent: true,  typicalRoll: 0.10 },
   SKILLRANK:    { label: '+ Skill Ranks',                         isPercent: false, typicalRoll: 5 },
-  EXTRAMULT:    { label: 'x% Standalone Multiplier (aspect/unique)', isPercent: true, typicalRoll: 0.10 },
+  EXTRAMULT:    { label: 'Custom x% (standalone aspect/unique)', isPercent: true, typicalRoll: 0.10 },
 };
 
 export const BUCKET_ORDER: Bucket[] = ['CSDM','VDM','DOTM','ALLM','NONPHYS','ADDITIVE','CRITADD','MAINSTAT','MAINSTAT_PCT','WEPDMG','GEM','CRITCHANCE','SKILLRANK','EXTRAMULT'];
