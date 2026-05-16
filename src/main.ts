@@ -153,7 +153,7 @@ function renderHeader() {
 // ---------- Card 1: Baseline Stats (class + skill + stats sheet numbers) ----------
 function nakedBaselineCard() {
   const cls = classFor(build);
-  const card = sectionCard('Baseline Stats');
+  const card = sectionCard('Baseline Stats', 'Strip all gear (armor, jewelry, weapons, charms, seal) so the numbers below reflect only your level / paragon contribution. Re-equip after you copy the stats sheet values.');
 
   // Class + skill inputs live at the top, since the user has to be naked to read both these and the stats-sheet numbers below.
   const topGrid = el('div', { class: 'grid grid-cols-2 gap-3 mb-3' });
