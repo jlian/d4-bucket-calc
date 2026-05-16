@@ -221,14 +221,14 @@ function nakedBaselineCard() {
   help.append(body);
   card.append(help);
 
-  const critRow = el('div', { class: 'mb-3 flex items-center gap-2' });
+  // All additive lines, in-game order, no split. Crit chance lives in the same grid as the first row
+  // so the inputs all line up consistently.
+  const grid = el('div', { class: 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2' });
+  const critRow = el('div', { class: 'flex items-center gap-2' });
   critRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, 'Critical Strike Chance'));
   critRow.append(pctInput(() => build.baseCritChance, v => build.baseCritChance = v, { w: 'w-24', step: 0.5 }));
   critRow.append(el('span', { class: 'text-zinc-600 text-xs' }, '%'));
-  card.append(critRow);
-
-  // All additive lines, in-game order, no split
-  const grid = el('div', { class: 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2' });
+  grid.append(critRow);
   for (const line of build.additiveLines) {
     const row = el('div', { class: 'flex items-center gap-2' });
     row.append(el('div', { class: 'flex-1 text-xs text-zinc-400' }, line.label));
@@ -240,7 +240,7 @@ function nakedBaselineCard() {
 
   // Custom additive entries: for additive stat lines that exist in the in-game offensive tab but aren't in our default list (e.g., Rogue's Damage with Imbued, Damage vs Distant)
   card.append(el('h4', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-4 mb-2' }, 'Other additive lines'));
-  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'For additive damage lines on your in-game offensive tab that aren’t in the default list above (e.g., “Damage with Ultimate”, “Damage vs Close”, “Damage vs Distant”, “Damage vs Healthy”, “Damage vs Crowd Controlled”, Rogue’s “Damage with Imbued”, etc.). Same rule: copy the BOTTOM tooltip number from the offensive tab. Anything you add here is treated as always-on and gets included in the result, even if it’s technically conditional in-game.'));
+  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'For additive damage lines on your in-game offensive tab that aren’t in the default list above (like “Damage vs Distant”, “Damage vs Healthy”, “Damage vs Crowd Controlled”, etc.). Same rule: copy the BOTTOM tooltip number from the offensive tab. Anything you add here is treated as always-on and gets included in the result, even if it’s technically conditional in-game.'));
   const paragonSlot = build.slots.find(s => s.id === 'paragon');
   if (paragonSlot) {
     const customAdds = paragonSlot.affixes.filter(a => a.bucket === 'ADDITIVE');
