@@ -94,7 +94,6 @@ function mount() {
   root.append(main);
 
   const left = el('div', { class: 'space-y-6' });
-  left.append(classSkillCard());
   left.append(nakedBaselineCard());
   left.append(slotsCard());
   left.append(charmsCard());
@@ -151,11 +150,13 @@ function renderHeader() {
   );
 }
 
-// ---------- Card 1: Class & Skill ----------
-function classSkillCard() {
+// ---------- Card 1: Naked Baseline (class + skill + offensive tab numbers) ----------
+function nakedBaselineCard() {
   const cls = classFor(build);
-  const card = sectionCard('Class & Skill');
-  const grid = el('div', { class: 'grid grid-cols-2 gap-3' });
+  const card = sectionCard('Naked Baseline (class, skill, offensive tab)');
+
+  // Class + skill inputs live at the top, since the user has to be naked to read both these and the offensive-tab numbers below.
+  const topGrid = el('div', { class: 'grid grid-cols-2 gap-3 mb-3' });
 
   const classSel = el('select', { class: inputCls() + ' w-full' }) as HTMLSelectElement;
   for (const c of CLASSES) {
@@ -176,19 +177,11 @@ function classSkillCard() {
     persist(build);
     mount();
   });
-  grid.append(field('Class', classSel));
-
-  grid.append(field('Skill Damage % at rank 1 (e.g. 115 for Blessed Hammer)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
-  grid.append(field('Skill Ranks (naked, usually 15)', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
-  grid.append(field(`${cls.mainStat} (naked, no gear/charms)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
-
-  card.append(grid);
-  return card;
-}
-
-// ---------- Card 2: Naked Baseline ----------
-function nakedBaselineCard() {
-  const card = sectionCard('Damage Stats (Naked Baseline)');
+  topGrid.append(field('Class', classSel));
+  topGrid.append(field('Skill Damage % at rank 1 (e.g. 115 for Blessed Hammer)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
+  topGrid.append(field('Skill Ranks (naked, usually 15)', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
+  topGrid.append(field(`${cls.mainStat} (naked, no gear/charms)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
+  card.append(topGrid);
 
   // Replace the long single-paragraph subtitle with bullet steps + a reference screenshot
   const help = el('details', { class: 'mb-3 text-xs text-zinc-400', open: '' });
@@ -484,7 +477,7 @@ function scenarioCritOnly(b: Build, scenario: any): number {
 
 // ---------- OUTPUT: Buckets ----------
 function bucketsCard() {
-  const card = sectionCard('Most Valuable Affixes');
+  const card = sectionCard('Upgrade Priority');
 
   const c = calc(build);
   if (c.weaponDmg === 0) {
@@ -499,7 +492,6 @@ function bucketsCard() {
   const rows: Row[] = [
     { affix: 'x10% Critical Strike Damage Multiplier', gain: weightFor(build, 'CSDM', 0.10, refScenario) },
     { affix: 'x10% Vulnerable Damage Multiplier',      gain: weightFor(build, 'VDM', 0.10, refScenario) },
-    { affix: 'x10% Damage Over Time Multiplier',       gain: weightFor(build, 'DOTM', 0.10, refScenario) },
     { affix: 'x10% All / Element Damage Multiplier',   gain: weightFor(build, 'ALLM', 0.10, refScenario) },
     { affix: '+10% Critical Strike Damage',            gain: weightFor(build, 'CRITADD', 0.10, refScenario) },
     { affix: '+10% Damage (additive)',                 gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) },
