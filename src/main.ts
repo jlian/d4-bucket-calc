@@ -366,40 +366,20 @@ function slotBlock(slot: Slot) {
   header.append(addBtn);
   wrap.append(header);
 
-  // Armor gems live on helm, chest, and pants. The in-game socket reads as a + Main Stat affix
-  // and is easy to forget when filling the form, so we pin a small dedicated input. The value is
-  // stored as a normal MAINSTAT affix with a known label so we can find/update it idempotently.
+  // Armor gem labels live below the affix list (see end of slotBlock) so they mirror in-game ordering.
   const ARMOR_GEM_SLOTS = new Set(['helm', 'chest', 'pants']);
-  if (ARMOR_GEM_SLOTS.has(slot.id)) {
-    const cls = classFor(build);
-    const GEM_LABEL = 'Armor gem';
-    const gemRow = el('div', { class: 'flex items-center gap-2 mb-2 pb-2 border-b border-zinc-800/60' });
-    gemRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' },
-      `Armor Gem (+ ${cls.mainStat})`,
-      el('span', { class: 'text-zinc-600 ml-1', title: 'Sockets a Royal/Grand gem for your main stat. Typical endgame roll is +80 to +120.' }, 'ⓘ'),
-    ));
-    gemRow.append(numInput(
-      () => slot.affixes.find(a => a.bucket === 'MAINSTAT' && a.label === GEM_LABEL)?.value ?? 0,
-      v => {
-        const existing = slot.affixes.find(a => a.bucket === 'MAINSTAT' && a.label === GEM_LABEL);
-        if (existing) {
-          if (v === 0) slot.affixes.splice(slot.affixes.indexOf(existing), 1);
-          else existing.value = v;
-        } else if (v !== 0) {
-          slot.affixes.push({ bucket: 'MAINSTAT', value: v, label: GEM_LABEL });
-        }
-      },
-      { w: 'w-24 text-right' },
-    ));
-    gemRow.append(el('span', { class: 'text-zinc-600 text-xs w-3 inline-block' }, ''));
-    wrap.append(gemRow);
-  }
+  const GEM_LABELS = ['Armor gem 1', 'Armor gem 2'];
 
   // (Removed weaponAvgDamage input. The hardcoded baseline + WEPDMG affix already matches the in-game tooltip.)
 
-  if (slot.affixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
+  // Hide armor-gem affixes from the normal affix list since they get dedicated checkbox rows below.
+  const isArmorGemAffix = (a: { bucket: Bucket; label?: string }) =>
+    ARMOR_GEM_SLOTS.has(slot.id) && a.bucket === 'MAINSTAT' && !!a.label && GEM_LABELS.includes(a.label);
+  const visibleAffixes = slot.affixes.map((a, i) => ({ a, i })).filter(({ a }) => !isArmorGemAffix(a));
 
-  slot.affixes.forEach((a, idx) => {
+  if (visibleAffixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
+
+  visibleAffixes.forEach(({ a, i: idx }) => {
     const row = el('div', { class: 'flex flex-wrap sm:flex-nowrap gap-2 mb-1.5 items-center min-w-0' });
     const sel = el('select', { class: inputCls() + ' w-full sm:flex-1 min-w-0' }) as HTMLSelectElement;
     const candidates = BUCKET_ORDER.filter(b => isWeapon || (b !== 'WEPDMG' && b !== 'GEM'));
@@ -441,6 +421,46 @@ function slotBlock(slot: Slot) {
     row.append(del);
     wrap.append(row);
   });
+
+  // Armor gem sockets for helm/chest/pants. Mirror in-game ordering by placing them BELOW affixes,
+  // and use checkboxes to mimic the "slot/unslot a gem" experience. When checked, the gem exists
+  // in slot.affixes as a MAINSTAT entry with a known label. Default value on first slot is 100
+  // (typical Royal mainstat roll); user can edit the number inline.
+  if (ARMOR_GEM_SLOTS.has(slot.id)) {
+    const cls = classFor(build);
+    const DEFAULT_GEM_VALUE = 100;
+    const gemHeader = el('div', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-3 mb-1.5' }, `Armor Gem Sockets (+ ${cls.mainStat})`);
+    wrap.append(gemHeader);
+    GEM_LABELS.forEach((gemLabel, gemIdx) => {
+      const findGem = () => slot.affixes.find(a => a.bucket === 'MAINSTAT' && a.label === gemLabel);
+      const gemRow = el('label', { class: 'flex items-center gap-2 mb-1 cursor-pointer text-sm select-none' });
+      const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
+      cb.checked = !!findGem();
+      cb.addEventListener('change', () => {
+        const existing = findGem();
+        if (cb.checked && !existing) {
+          slot.affixes.push({ bucket: 'MAINSTAT', value: DEFAULT_GEM_VALUE, label: gemLabel });
+        } else if (!cb.checked && existing) {
+          slot.affixes.splice(slot.affixes.indexOf(existing), 1);
+        }
+        mount();
+      });
+      gemRow.append(cb);
+      gemRow.append(el('span', { class: 'flex-1 text-zinc-400' }, `Gem ${gemIdx + 1}`));
+      // Inline +stat input only meaningful when slotted.
+      if (cb.checked) {
+        gemRow.append(numInput(
+          () => findGem()?.value ?? 0,
+          v => { const g = findGem(); if (g) g.value = v; },
+          { w: 'w-20 text-right' },
+        ));
+      } else {
+        gemRow.append(el('span', { class: 'text-xs text-zinc-600' }, 'not slotted'));
+      }
+      wrap.append(gemRow);
+    });
+  }
+
   return wrap;
 }
 
