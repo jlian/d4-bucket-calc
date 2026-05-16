@@ -303,10 +303,14 @@ const CLASS_HINTS: Record<string, string> = {
 };
 
 function paragonContributionsCard() {
-  const baseSubtitle = 'Anything that contributes damage outside of gear, charms, glyphs, and the stats sheet. Skills, paragon nodes, key passives, class mechanics, auras, sacrifices, and similar. Add one row per source. Skip anything whose % already shows up on the stats sheet, it\u2019s already counted above.';
-  const hint = CLASS_HINTS[build.classId];
   const card = sectionCard('Other Buffs & Multipliers',
-    hint ? `${baseSubtitle} ${hint}` : baseSubtitle);
+    'Anything that contributes damage outside of gear, charms, glyphs, and the stats sheet. Skills, paragon nodes, key passives, class mechanics, auras, sacrifices, and similar. Add one row per source. Skip anything whose % already shows up on the stats sheet, it\u2019s already counted above.');
+  const hint = CLASS_HINTS[build.classId];
+  if (hint) {
+    card.append(el('p', { class: 'text-xs text-zinc-500 -mt-2 mb-3' },
+      el('span', { class: 'text-zinc-400' }, `Common sources for ${build.classId}:`),
+      ' ', hint));
+  }
   const slot = build.slots.find(s => s.id === 'paragon');
   if (slot) card.append(slotBlock(slot));
   return card;
