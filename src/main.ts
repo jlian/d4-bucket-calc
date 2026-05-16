@@ -200,8 +200,8 @@ function nakedBaselineCard() {
   const card = sectionCard('Damage Stats (Naked Baseline)');
 
   // Replace the long single-paragraph subtitle with bullet steps + a reference screenshot
-  const help = el('details', { class: 'mb-3 text-xs text-zinc-400' });
-  const summary = el('summary', { class: 'cursor-pointer text-zinc-300 select-none' }, 'How to fill this in (read once, takes 2 min in-game)');
+  const help = el('details', { class: 'mb-3 text-xs text-zinc-400', open: '' });
+  const summary = el('summary', { class: 'cursor-pointer text-zinc-300 select-none' }, 'How to fill this in (takes 2 min in-game)');
   help.append(summary);
   const body = el('div', { class: 'mt-2 grid sm:grid-cols-[1fr_auto] gap-3 items-start' });
   const steps = el('ol', { class: 'list-decimal list-inside space-y-1 text-zinc-400' });
@@ -497,24 +497,13 @@ function scenarioCritOnly(b: Build, scenario: any): number {
 
 // ---------- OUTPUT: Buckets ----------
 function bucketsCard() {
-  const card = sectionCard('Most Valuable Affixes',
-    'Each row: what a typical fresh affix of this type would gain you. Sorted by impact.');
+  const card = sectionCard('Most Valuable Affixes');
 
   const c = calc(build);
   if (c.weaponDmg === 0) {
     card.append(el('p', { class: 'text-xs text-amber-400' }, '⚠️ Pick a weapon type to compute weights.'));
     return card;
   }
-
-  // "How buckets work" up top so first-time readers see it before the table of numbers.
-  card.append(el('details', { class: 'mb-3 text-xs text-zinc-500 border border-zinc-800/60 rounded p-2' },
-    el('summary', { class: 'cursor-pointer text-zinc-400 select-none' }, 'How buckets work (read once)'),
-    el('div', { class: 'mt-2 text-zinc-400 space-y-2' },
-      el('p', {}, 'Same-named affixes ', el('strong', {}, 'sum into one bucket'), '; the bucket then multiplies into the damage formula. A small bucket gains more from a new affix than a big one.'),
-      el('p', {}, 'Example: CSDM bucket at +150% (×2.50). Adding x10% → +160% (×2.60). Damage gain = 2.60 / 2.50 = +4%. If your Vulnerable bucket only had +20% (×1.20), same +10% affix goes to ×1.30 → +8.3% — twice as good.'),
-      el('p', {}, el('strong', {}, '+ vs x: '), '“+75% Crit Damage” joins the giant additive bucket. “x56% Crit Damage Multiplier” is its own much smaller bucket. The x version is usually 3-5× more valuable in late game.'),
-    ),
-  ));
 
   const refScenario = build.disableCrit
     ? presetScenarios().find(s => s.id === 'dot')!
@@ -551,6 +540,16 @@ function bucketsCard() {
   }
   table.append(tb);
   card.append(table);
+
+  // "How buckets work" at the bottom, expanded by default.
+  card.append(el('details', { class: 'mt-4 text-xs text-zinc-500 border border-zinc-800/60 rounded p-2', open: '' },
+    el('summary', { class: 'cursor-pointer text-zinc-400 select-none' }, 'How buckets work'),
+    el('div', { class: 'mt-2 text-zinc-400 space-y-2' },
+      el('p', {}, 'Same-named affixes ', el('strong', {}, 'sum into one bucket'), '; the bucket then multiplies into the damage formula. A small bucket gains more from a new affix than a big one.'),
+      el('p', {}, 'Example: CSDM bucket at +150% (×2.50). Adding x10% → +160% (×2.60). Damage gain = 2.60 / 2.50 = +4%. If your Vulnerable bucket only had +20% (×1.20), same +10% affix goes to ×1.30 → +8.3% — twice as good.'),
+      el('p', {}, el('strong', {}, '+ vs x: '), '“+75% Crit Damage” joins the giant additive bucket. “x56% Crit Damage Multiplier” is its own much smaller bucket. The x version is usually 3-5× more valuable in late game.'),
+    ),
+  ));
 
   return card;
 }
