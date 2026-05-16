@@ -178,17 +178,9 @@ function classSkillCard() {
   });
   grid.append(field('Class', classSel));
 
-  grid.append(field('Skill name', textInput(() => build.skillName, v => build.skillName = v, { w: 'w-full', placeholder: 'e.g. Holy Bolt' })));
   grid.append(field('Skill Damage % at rank 1 (e.g. 115 for Blessed Hammer)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
   grid.append(field('Skill Ranks (naked, usually 15)', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
   grid.append(field(`${cls.mainStat} (naked, no gear/charms)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
-
-  const checkWrap = el('label', { class: 'flex items-center gap-2 col-span-2 text-sm cursor-pointer mt-1' });
-  const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
-  cb.checked = build.disableCrit;
-  cb.addEventListener('change', () => { build.disableCrit = cb.checked; afterInput(); });
-  checkWrap.append(cb, document.createTextNode('DoT build (disable crit)'));
-  grid.append(checkWrap);
 
   card.append(grid);
   return card;
@@ -434,6 +426,15 @@ function scenariosCard() {
     cb.checked = !!scenarioState[t.key];
     cb.addEventListener('change', () => { scenarioState[t.key] = cb.checked; refreshOutputs(); });
     lbl.append(cb, document.createTextNode(t.label));
+    toggleWrap.append(lbl);
+  }
+  // DoT toggle (lives on the build, not scenarioState, because it changes the whole calc model).
+  {
+    const lbl = el('label', { class: 'flex items-center gap-1 text-xs text-zinc-400 cursor-pointer' });
+    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
+    cb.checked = build.disableCrit;
+    cb.addEventListener('change', () => { build.disableCrit = cb.checked; afterInput(); });
+    lbl.append(cb, document.createTextNode('DoT build (no crit)'));
     toggleWrap.append(lbl);
   }
   card.append(toggleWrap);
