@@ -23,18 +23,19 @@
         { "bucket": "CRITCHANCE", "value": 0.21 },
         { "bucket": "SKILLRANK",  "value": 3 },
         { "bucket": "EXTRAMULT",  "value": 0.8,   "label": "Heir of Perdition x80% damage" },
-        { "bucket": "MAINSTAT",   "value": 100,   "label": "Armor gem 1" }
+        { "bucket": "MAINSTAT",   "value": 90,   "label": "Armor gem 1" }
       ]
     },
     { "id": "chest",  "name": "Chest",  "affixes": [
-      { "bucket": "MAINSTAT", "value": 100, "label": "Armor gem 1" }
+      { "bucket": "MAINSTAT", "value": 90, "label": "Armor gem 1" }
     ] },
     {
       "id": "pants",
       "name": "Pants",
       "affixes": [
         { "bucket": "MAINSTAT", "value": 182 },
-        { "bucket": "MAINSTAT", "value": 100, "label": "Armor gem 1" }
+        { "bucket": "MAINSTAT", "value": 90, "label": "Armor gem 1" },
+        { "bucket": "MAINSTAT", "value": 90, "label": "Armor gem 2" }
       ]
     },
     {
@@ -89,7 +90,7 @@
         { "bucket": "CSDM",       "value": 0.21 },
         { "bucket": "ALLM",       "value": 0.13 },
         { "bucket": "CRITCHANCE", "value": 0.1 },
-        { "bucket": "GEM",        "value": 0.24, "label": "Royal weapon gem" },
+        { "bucket": "GEM",        "value": 0.24, "label": "Weapon gem" },
         { "bucket": "EXTRAMULT",  "value": 0.98, "label": "Herald's Morningstar x98% Blessed Hammer" }
       ]
     },

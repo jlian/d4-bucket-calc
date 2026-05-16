@@ -366,16 +366,29 @@ function slotBlock(slot: Slot) {
   header.append(addBtn);
   wrap.append(header);
 
-  // Armor gem labels live below the affix list (see end of slotBlock) so they mirror in-game ordering.
+  // Armor gems live on helm, chest, pants; weapon gems live on weapon slots.
+  // The actual affix list hides any gem entries (matched by known label) so they only appear
+  // in the dedicated Gem Sockets block below.
   const ARMOR_GEM_SLOTS = new Set(['helm', 'chest', 'pants']);
-  const GEM_LABELS = ['Armor gem 1', 'Armor gem 2'];
+  const ARMOR_GEM_LABELS = ['Armor gem 1', 'Armor gem 2'];
+  const WEAPON_GEM_LABEL = 'Weapon gem';
+  const isArmorGemSlot = ARMOR_GEM_SLOTS.has(slot.id);
+  const isWeaponGemSlot = slot.id.startsWith('wep');
+  const gemLabels = isArmorGemSlot ? ARMOR_GEM_LABELS
+    : isWeaponGemSlot ? [WEAPON_GEM_LABEL]
+    : [];
 
   // (Removed weaponAvgDamage input. The hardcoded baseline + WEPDMG affix already matches the in-game tooltip.)
 
-  // Hide armor-gem affixes from the normal affix list since they get dedicated checkbox rows below.
-  const isArmorGemAffix = (a: { bucket: Bucket; label?: string }) =>
-    ARMOR_GEM_SLOTS.has(slot.id) && a.bucket === 'MAINSTAT' && !!a.label && GEM_LABELS.includes(a.label);
-  const visibleAffixes = slot.affixes.map((a, i) => ({ a, i })).filter(({ a }) => !isArmorGemAffix(a));
+  // Hide gem affixes from the normal affix list since they get dedicated checkbox rows below.
+  // Armor gems are MAINSTAT-bucket; weapon gems are GEM-bucket. Both match by known label.
+  const isHiddenGemAffix = (a: { bucket: Bucket; label?: string }) => {
+    if (!a.label) return false;
+    if (isArmorGemSlot && a.bucket === 'MAINSTAT' && ARMOR_GEM_LABELS.includes(a.label)) return true;
+    if (isWeaponGemSlot && a.bucket === 'GEM' && a.label === WEAPON_GEM_LABEL) return true;
+    return false;
+  };
+  const visibleAffixes = slot.affixes.map((a, i) => ({ a, i })).filter(({ a }) => !isHiddenGemAffix(a));
 
   if (visibleAffixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
 
@@ -422,41 +435,61 @@ function slotBlock(slot: Slot) {
     wrap.append(row);
   });
 
-  // Armor gem sockets for helm/chest/pants. Mirror in-game ordering by placing them BELOW affixes,
-  // and use checkboxes to mimic the "slot/unslot a gem" experience. When checked, the gem exists
-  // in slot.affixes as a MAINSTAT entry with a known label. Default value on first slot is 100
-  // (typical Royal mainstat roll); user can edit the number inline.
-  if (ARMOR_GEM_SLOTS.has(slot.id)) {
+  // Gem sockets: armor (helm/chest/pants) sockets a +MAINSTAT gem; weapons socket a Royal gem
+  // which lands in the GEM bucket (sums into All / Element). Mirror the in-game UI by placing
+  // these BELOW the affix list and using checkboxes. The +stat input is always rendered (just
+  // disabled when unchecked) so checking the box doesn't reflow the row.
+  if (gemLabels.length > 0) {
     const cls = classFor(build);
-    const DEFAULT_GEM_VALUE = 100;
-    const gemHeader = el('div', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-3 mb-1.5' }, `Armor Gem Sockets (+ ${cls.mainStat})`);
-    wrap.append(gemHeader);
-    GEM_LABELS.forEach((gemLabel, gemIdx) => {
-      const findGem = () => slot.affixes.find(a => a.bucket === 'MAINSTAT' && a.label === gemLabel);
+    const isArmor = isArmorGemSlot;
+    const defaultValue = isArmor ? 90 : 0.24; // 90 mainstat / 24% damage for armor vs weapon gems
+    const headerLabel = isArmor
+      ? `Armor Gem Sockets (+ ${cls.mainStat})`
+      : 'Weapon Gem Socket (x% Damage, sums into All / Element)';
+    wrap.append(el('div', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-3 mb-1.5' }, headerLabel));
+    gemLabels.forEach((gemLabel, gemIdx) => {
+      const bucket: Bucket = isArmor ? 'MAINSTAT' : 'GEM';
+      const findGem = () => slot.affixes.find(x => x.bucket === bucket && x.label === gemLabel);
       const gemRow = el('label', { class: 'flex items-center gap-2 mb-1 cursor-pointer text-sm select-none' });
       const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
       cb.checked = !!findGem();
+      gemRow.append(cb);
+      gemRow.append(el('span', { class: 'flex-1 text-zinc-400' }, gemLabels.length === 1 ? 'Royal gem' : `Gem ${gemIdx + 1}`));
+
+      // Pre-create the input so the row layout is identical whether or not the gem is slotted.
+      const valWrap = el('div', { class: 'flex items-center gap-1 shrink-0' });
+      const input = (isArmor
+        ? numInput(
+            () => findGem()?.value ?? defaultValue,
+            v => { const g = findGem(); if (g) g.value = v; },
+            { w: 'w-20 text-right' })
+        : pctInput(
+            () => findGem()?.value ?? defaultValue,
+            v => { const g = findGem(); if (g) g.value = v; },
+            { w: 'w-20 text-right' })) as HTMLInputElement;
+      valWrap.append(input);
+      valWrap.append(el('span', { class: 'text-zinc-600 text-xs w-3 inline-block' }, isArmor ? '' : '%'));
+      gemRow.append(valWrap);
+
+      const applyDisabled = () => {
+        input.disabled = !cb.checked;
+        input.classList.toggle('opacity-40', !cb.checked);
+      };
+      applyDisabled();
+
       cb.addEventListener('change', () => {
         const existing = findGem();
         if (cb.checked && !existing) {
-          slot.affixes.push({ bucket: 'MAINSTAT', value: DEFAULT_GEM_VALUE, label: gemLabel });
+          slot.affixes.push({ bucket, value: defaultValue, label: gemLabel });
         } else if (!cb.checked && existing) {
           slot.affixes.splice(slot.affixes.indexOf(existing), 1);
         }
-        mount();
+        applyDisabled();
+        // Update the visible number to reflect the slotted/default value without rebuilding the row.
+        input.value = String(findGem()?.value ?? defaultValue);
+        afterInput();
       });
-      gemRow.append(cb);
-      gemRow.append(el('span', { class: 'flex-1 text-zinc-400' }, `Gem ${gemIdx + 1}`));
-      // Inline +stat input only meaningful when slotted.
-      if (cb.checked) {
-        gemRow.append(numInput(
-          () => findGem()?.value ?? 0,
-          v => { const g = findGem(); if (g) g.value = v; },
-          { w: 'w-20 text-right' },
-        ));
-      } else {
-        gemRow.append(el('span', { class: 'text-xs text-zinc-600' }, 'not slotted'));
-      }
+
       wrap.append(gemRow);
     });
   }
