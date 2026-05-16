@@ -60,7 +60,7 @@ export function weaponTypeById(id: string): WeaponType {
 export type Bucket =
   | 'CSDM' | 'VDM' | 'DOTM' | 'ALLM' | 'NONPHYS'
   | 'ADDITIVE' | 'CRITADD'
-  | 'MAINSTAT' | 'MAINSTAT_PCT' | 'WEPDMG' | 'GEM'
+  | 'MAINSTAT' | 'MAINSTAT_PCT' | 'WEPDMG' | 'WEPDMG_PCT' | 'GEM'
   | 'CRITCHANCE' | 'SKILLRANK' | 'EXTRAMULT';
 
 export interface Affix { bucket: Bucket; value: number; label?: string; }
@@ -221,7 +221,10 @@ export function computeWeaponDamage(b: Build): { dmg: number; speed: number; has
     if (w1 && w2 && weaponTypeById(w1.weaponTypeId ?? 'none').hands === 2 && weaponTypeById(w2.weaponTypeId ?? 'none').hands === 2) dmg *= 2;
   }
   const speed = speedCount > 0 ? speedSum / speedCount : 0;
-  return { dmg, speed, hasAny };
+  // Bonus % weapon damage from any slot (e.g. Herald of Zakarum's +100% main hand weapon damage on the shield).
+  // Sums additively across slots and multiplies the final weapon-damage value as (1 + sum).
+  const wepDmgPctSum = sumAffixes(b.slots, 'WEPDMG_PCT');
+  return { dmg: dmg * (1 + wepDmgPctSum), speed, hasAny };
 }
 
 export function calc(b: Build): Calc {
@@ -347,13 +350,14 @@ export const BUCKET_META: Record<Bucket, { label: string; isPercent: boolean; ty
   MAINSTAT:     { label: '+ Main Stat (Str/Dex/Int/Will)',        isPercent: false, typicalRoll: 200 },
   MAINSTAT_PCT: { label: 'x% Main Stat Multiplier',               isPercent: true,  typicalRoll: 0.10 },
   WEPDMG:       { label: '+ Weapon Damage',                       isPercent: false, typicalRoll: 196 },
+  WEPDMG_PCT:   { label: 'x% Weapon Damage (e.g. shield bonus)',  isPercent: true,  typicalRoll: 1.0 },
   GEM:          { label: 'Weapon Gem (sums into All / Element)',  isPercent: true,  typicalRoll: 0.10 },
   CRITCHANCE:   { label: '+% Critical Strike Chance',             isPercent: true,  typicalRoll: 0.10 },
   SKILLRANK:    { label: '+ Skill Ranks',                         isPercent: false, typicalRoll: 5 },
   EXTRAMULT:    { label: 'Custom [x]%', isPercent: true, typicalRoll: 0.10 },
 };
 
-export const BUCKET_ORDER: Bucket[] = ['CSDM','VDM','DOTM','ALLM','NONPHYS','ADDITIVE','CRITADD','MAINSTAT','MAINSTAT_PCT','WEPDMG','GEM','CRITCHANCE','SKILLRANK','EXTRAMULT'];
+export const BUCKET_ORDER: Bucket[] = ['CSDM','VDM','DOTM','ALLM','NONPHYS','ADDITIVE','CRITADD','MAINSTAT','MAINSTAT_PCT','WEPDMG','WEPDMG_PCT','GEM','CRITCHANCE','SKILLRANK','EXTRAMULT'];
 
 export function presetScenarios(): Scenario[] {
   return [

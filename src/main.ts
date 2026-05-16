@@ -575,7 +575,7 @@ function formulaCard() {
   // Min/max heuristic
   card.append(el('p', { class: 'text-zinc-400 mb-3 text-sm' },
     'For two buckets at sizes ', katexInline('A'), ' and ', katexInline('B'),
-    ', the same affix is ', katexInline('B / A'), ' times more valuable in the smaller one. Spread your multipliers \u2014 a product is maximized when its factors are balanced (',
+    ', the same affix is ', katexInline('B / A'), ' times more valuable in the smaller one. Spread your multipliers: a product is maximized when its factors are balanced (',
     Object.assign(el('a', { href: 'https://en.wikipedia.org/wiki/Inequality_of_arithmetic_and_geometric_means', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'AM-GM inequality' }), ').',
   ));
 
@@ -584,7 +584,7 @@ function formulaCard() {
 
   card.append(el('p', { class: 'text-xs text-zinc-500 mt-4' },
     'Methodology, formulas, weapon damage values, and stacking rules: ',
-    Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=2GKhCdxxqp8', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Avarilyn \u2014 Damage Calculation Explained with Proof' }),
+    Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=2GKhCdxxqp8', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Avarilyn: Damage Calculation Explained with Proof' }),
     ' / ',
     Object.assign(el('a', { href: 'https://www.youtube.com/watch?v=as8y_zGlPrs', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'How to Optimize Damage' }),
     ' / ',
@@ -677,7 +677,8 @@ function buildPluggedIn(): HTMLElement {
     el('th', { class: 'text-right py-1 font-normal whitespace-nowrap' }, 'Math'),
     el('th', { class: 'text-right py-1 font-normal pl-3 whitespace-nowrap' }, 'Value'),
   )));
-  type Row = [string, string, string, number];
+  type RowDesc = string | (string | Node)[];
+  type Row = [string, RowDesc, string, number];
   const usedAdd = additive + critAdd;
   const addMath = additiveBreakdownMath(build, conds, true);
   // Skill coef step formula at N total ranks: base × (1 + 0.10 × (N - floor(N/5) - 1) + 0.15 × floor(N/5))
@@ -690,23 +691,50 @@ function buildPluggedIn(): HTMLElement {
   const csdmMath = bucketBreakdownMath(build, 'CSDM');
   const vdmMath = bucketBreakdownMath(build, 'VDM');
   const allmMath = bucketBreakdownMath(build, 'ALLM');
+  const wepDmgPctSum = build.slots.reduce((s, slot) => s + slot.affixes.filter(a => a.bucket === 'WEPDMG_PCT').reduce((ss, a) => ss + a.value, 0), 0);
   const rows: Row[] = [
-    ['W',                       'Average weapon damage from your equipped weapon(s).',                                        '',                                            c.weaponDmg],
-    ['(1 + A)',                 critAdd > 0 ? 'Additive damage bucket. On a crit, includes the +Crit Damage additive too; non-crit hits use just the base bucket.' : 'Sum of all additive damage % bonuses.', addMath || `1 + ${dec(usedAdd)}`, 1 + usedAdd],
-    [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier. Divisor is ${cls.divisor} for ${build.classId} (Barbarian uses 900, all others 800).`, `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
-    ['C',                       'Skill damage coefficient. Step formula: base × (1 + 0.10·(N - ⌊N/5⌋ - 1) + 0.15·⌊N/5⌋) where N = total ranks. Every multiple of 5 ranks gets a 5% bonus on top.', skillMath, c.skillCoef],
-    [String.raw`\prod_i M_i`,    'Product of standalone aspect/unique multipliers. Each one is its own factor.', extraMultMath(build), c.extraMultProduct],
+    ['W',
+      wepDmgPctSum > 0
+        ? ['Average weapon damage from your equipped weapon(s), boosted by any ', katexInline('+\\%'), ' weapon damage affix (e.g. Herald of Zakarum\u2019s ', katexInline('+100\\%'), ' main-hand weapon damage). Combined as ', katexInline('W_{base} \\cdot (1 + \\Sigma)'), '.']
+        : 'Average weapon damage from your equipped weapon(s).',
+      wepDmgPctSum > 0 ? `× (1 + ${dec(wepDmgPctSum)})` : '',
+      c.weaponDmg],
+    ['(1 + A)',
+      critAdd > 0
+        ? ['Additive damage bucket. On a crit, includes the ', katexInline('+\\%'), ' Crit Damage additive too; non-crit hits use just the base bucket.']
+        : 'Sum of all additive damage % bonuses.',
+      addMath || `1 + ${dec(usedAdd)}`, 1 + usedAdd],
+    [`(1 + S/${cls.divisor})`,
+      [`${cls.mainStat} multiplier. Divisor is `, katexInline(String(cls.divisor)), ` for ${build.classId} (Barbarian uses `, katexInline('900'), ', all others ', katexInline('800'), ').'],
+      `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
+    ['C',
+      ['Skill damage coefficient. Step formula: ', katexInline(String.raw`\text{base} \cdot \left(1 + 0.10 \cdot (N - \lfloor N/5 \rfloor - 1) + 0.15 \cdot \lfloor N/5 \rfloor\right)`), ' where ', katexInline('N'), ' = total ranks. Every multiple of 5 ranks gets a ', katexInline('+5\\%'), ' bonus on top.'],
+      skillMath, c.skillCoef],
+    [String.raw`\prod_i M_i`,
+      'Product of standalone aspect/unique multipliers. Each one is its own factor.',
+      extraMultMath(build), c.extraMultProduct],
   ];
-  rows.push([String.raw`(1.5 \cdot M_{crit})^c`, 'Crit factor: 1.5 inherent crit baseline times the Critical Strike Damage Multiplier bucket. Active only on crit hits (c = 1).', `1.5 × (${csdmMath})`, c.csdm * 1.5]);
-  rows.push([String.raw`(1.2 \cdot M_{vuln})^v`, 'Vulnerable factor: 1.2 inherent vuln baseline times the Vulnerable Damage Multiplier bucket. Active only against vulnerable targets (v = 1).', conds.vulnerable ? `1.2 × (${vdmMath})` : 'inactive (v = 0)', vdmFactor]);
-  rows.push(['M_{all}',          'All / Element Damage Multiplier bucket. Includes weapon gem damage which sums into this bucket.', allmMath, c.allm]);
-  rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy (80% reduction).`, `1 - 0.80`, build.enemyDamageFactor]);
+  rows.push([String.raw`(1.5 \cdot M_{crit})^c`,
+    ['Crit factor: ', katexInline('1.5'), ' inherent crit baseline times the Critical Strike Damage Multiplier bucket. Active only on crit hits (', katexInline('c = 1'), ').'],
+    `1.5 × (${csdmMath})`, c.csdm * 1.5]);
+  rows.push([String.raw`(1.2 \cdot M_{vuln})^v`,
+    ['Vulnerable factor: ', katexInline('1.2'), ' inherent vuln baseline times the Vulnerable Damage Multiplier bucket. Active only against vulnerable targets (', katexInline('v = 1'), ').'],
+    conds.vulnerable ? `1.2 × (${vdmMath})` : 'inactive (v = 0)', vdmFactor]);
+  rows.push(['M_{all}',
+    'All / Element Damage Multiplier bucket. Includes weapon gem damage which sums into this bucket.',
+    allmMath, c.allm]);
+  rows.push(['(1 - R)',
+    ['Enemy damage reduction. ', katexInline('R = 0.80'), ' for a level-appropriate enemy / training dummy (80% reduction).'],
+    `1 - 0.80`, build.enemyDamageFactor]);
 
   const tb = el('tbody');
   for (const [sym, desc, math, val] of rows) {
+    const descCell = el('td', { class: 'py-1 text-zinc-400 align-top' });
+    if (Array.isArray(desc)) descCell.append(...desc);
+    else descCell.append(desc);
     tb.append(el('tr', { class: 'border-b border-zinc-900 align-top' },
       el('td', { class: 'py-1 pr-3 align-top' }, katexInline(sym)),
-      el('td', { class: 'py-1 text-zinc-400 align-top' }, desc),
+      descCell,
       el('td', { class: 'py-1 text-right text-zinc-500 font-mono tabular-nums pl-2 align-top' }, math),
       el('td', { class: 'py-1 text-right font-mono text-amber-400 tabular-nums whitespace-nowrap pl-3 align-top' }, dec(val, 2)),
     ));
