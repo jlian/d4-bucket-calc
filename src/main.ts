@@ -555,45 +555,71 @@ function statsCard() {
   const c = calc(build);
   const cls = classFor(build);
   const card = sectionCard('Stats Summary');
-  // Two display modes:
-  //   bonus(n) -> in-game "+X%" style (n is the bonus on top of base)
-  //   ofBase(mult) -> total as % of base damage (mult includes the implicit 1)
-  // Use bonus() for individual stats sheet lines (matches what the game shows).
-  // Use ofBase() for skill damage and the standalone-multiplier product because the in-game
-  // tooltip for skill damage shows total coef, and the combined standalone product is best
-  // understood as the final factor it contributes to damage.
+  // Helpers:
+  //   bonus(n)  -> "+X.X%" style number for additive/bonus values (matches in-game stats sheet)
+  //   ofBase(n) -> total as % of base damage (for final-factor things like Skill Damage / standalone product)
   const bonus = (n: number, digits = 1) => `${(n * 100).toFixed(digits)}%`;
   const ofBase = (mult: number, digits = 1) => `${(mult * 100).toFixed(digits)}%`;
 
-  // Per-line additive values from Baseline Stats. Only show non-zero so the card stays scannable.
-  const additiveLineRows: [string, string][] = [];
-  for (const l of build.additiveLines) {
-    if (l.value === 0) continue;
-    additiveLineRows.push([`+% ${l.label}`, bonus(l.value)]);
-  }
-  const otherAdditive = build.slots.reduce((s, slot) =>
-    s + slot.affixes.filter(a => a.bucket === 'ADDITIVE').reduce((ss, a) => ss + a.value, 0), 0);
-  const critAddFromGear = build.slots.reduce((s, slot) =>
-    s + slot.affixes.filter(a => a.bucket === 'CRITADD').reduce((ss, a) => ss + a.value, 0), 0);
+  // Helper to total a single bucket across all gear/charm/glyph slots (no scenario filtering).
+  const sumBucket = (bk: Bucket) => build.slots.reduce((s, slot) =>
+    s + slot.affixes.filter(a => a.bucket === bk).reduce((ss, a) => ss + a.value, 0), 0);
 
-  // Order matches the natural reading flow of Baseline Stats and the affix dropdown:
-  //   1) weapon + raw inputs (W, mainstat, skill ranks/damage)
-  //   2) additive lines exactly as they appear in Baseline Stats (then any gear CRITADD, then Other)
-  //   3) crit chance, then the x% multiplier buckets in dropdown order (CSDM, VDM, ALLM)
-  //   4) standalone multipliers product at the end (final factor)
+  // Combined +% Critical Strike Damage: Baseline Stats line + gear CRITADD bucket.
+  // Both stack into the same additive bucket on crit hits, so showing them as one row matches
+  // how the calc actually uses them.
+  const baselineCrit = build.additiveLines.find(l => l.id === 'crit')?.value ?? 0;
+  const critDmgAdditive = baselineCrit + sumBucket('CRITADD');
+
+  // Other additive lines from Baseline Stats (non-crit-only ones). Each entered % shows as its own row.
+  // We use the line's user-facing label, prefixed with `+%`, so it reads like a stats-sheet entry.
+  const baselineAdditiveRows: [string, string][] = [];
+  for (const l of build.additiveLines) {
+    if (l.isCritOnly) continue;
+    if (l.value === 0) continue;
+    baselineAdditiveRows.push([`+% ${l.label}`, bonus(l.value)]);
+  }
+  // Custom "Other additive" entries (ADDITIVE bucket) go in a single combined row.
+  const otherAdditive = sumBucket('ADDITIVE');
+
+  // Other bucket totals (only render if non-zero so the card stays scannable).
+  const mainStatPctSum = sumBucket('MAINSTAT_PCT');
+  const wepDmgPctSum = sumBucket('WEPDMG_PCT');
+  const nonPhysSum = sumBucket('NONPHYS');
+  const gemSum = sumBucket('GEM');
+
+  // Order: computed totals first, then dropdown order (alphabetical by label),
+  // then custom buckets (ADDITIVE = "Other additive", EXTRAMULT = "Standalone product") last.
   const stats: [string, string][] = [];
-  stats.push(['+ Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : 'pick weapon']);
-  stats.push([`+ ${cls.mainStat}`, fmtNum(c.mainStatSum)]);
-  stats.push(['+ Skill Ranks', String(c.totalSkillRanks)]);
+
+  // --- Computed totals (raw numbers, no +/x prefix) ---
+  stats.push(['Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : 'pick weapon']);
+  stats.push([cls.mainStat, fmtNum(c.mainStatSum)]);
+  stats.push(['Skill Ranks', String(c.totalSkillRanks)]);
   stats.push(['Skill Damage', ofBase(c.skillCoef)]);
-  for (const r of additiveLineRows) stats.push(r);
-  if (critAddFromGear !== 0) stats.push(['+% Critical Strike Damage (gear, crit only)', bonus(critAddFromGear)]);
-  if (otherAdditive !== 0) stats.push(['Other additive damage', bonus(otherAdditive)]);
+
+  // --- Dropdown order (matches the affix select alphabetical sort) ---
+  // + Critical Strike Chance
   stats.push(['+% Critical Strike Chance', bonus(c.critChance, 1)]);
-  stats.push(['x% Critical Strike Damage Multiplier', bonus(c.csdm - 1)]);
-  stats.push(['x% Vulnerable Damage Multiplier', bonus(c.vdm - 1)]);
+  // + Critical Strike Damage (additive, baseline + gear CRITADD combined)
+  if (critDmgAdditive !== 0) stats.push(['+% Critical Strike Damage', bonus(critDmgAdditive)]);
+  // Other +% damage lines from Baseline Stats (Vulnerable, All, Element, Elites, etc.)
+  for (const r of baselineAdditiveRows) stats.push(r);
+  // x% multipliers in alphabetical order (matches dropdown)
   stats.push(['x% All / Element Damage Multiplier', bonus(c.allm - 1)]);
-  stats.push(['Standalone Multipliers (combined)', ofBase(c.extraMultProduct)]);
+  stats.push(['x% Critical Strike Damage Multiplier', bonus(c.csdm - 1)]);
+  // DoT and Non-Physical only if relevant.
+  if (c.dotm > 1) stats.push(['x% Damage Over Time Multiplier', bonus(c.dotm - 1)]);
+  if (mainStatPctSum !== 0) stats.push(['x% Main Stat Multiplier', bonus(mainStatPctSum)]);
+  if (nonPhysSum !== 0) stats.push(['x% Non-Physical Damage', bonus(nonPhysSum)]);
+  stats.push(['x% Vulnerable Damage Multiplier', bonus(c.vdm - 1)]);
+  if (wepDmgPctSum !== 0) stats.push(['x% Weapon Damage', bonus(wepDmgPctSum)]);
+  // Weapon gem rolls into All / Element; show as informational if any.
+  if (gemSum !== 0) stats.push(['Weapon Gem (in All / Element)', bonus(gemSum)]);
+
+  // --- Custom buckets last (matches dropdown order with Custom [+]% / [x]% at end) ---
+  if (otherAdditive !== 0) stats.push(['Other additive damage (Custom +%)', bonus(otherAdditive)]);
+  stats.push(['Standalone Multipliers combined (Custom x%)', ofBase(c.extraMultProduct)]);
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
     tbl.append(el('tr', {},
