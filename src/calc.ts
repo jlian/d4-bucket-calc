@@ -10,8 +10,8 @@ export const CLASSES: { id: ClassId; mainStat: string; divisor: number; weaponSl
   { id: 'Necromancer',  mainStat: 'Intelligence', divisor: 800, weaponSlots: 2 },
   { id: 'Rogue',        mainStat: 'Dexterity',    divisor: 800, weaponSlots: 3 },
   { id: 'Sorcerer',     mainStat: 'Intelligence', divisor: 800, weaponSlots: 2 },
-  { id: 'Spiritborn',   mainStat: 'Willpower',    divisor: 800, weaponSlots: 1 },
-  { id: 'Warlock',      mainStat: 'Intelligence', divisor: 800, weaponSlots: 2 },
+  { id: 'Spiritborn',   mainStat: 'Dexterity',    divisor: 800, weaponSlots: 1 },
+  { id: 'Warlock',      mainStat: 'Willpower',    divisor: 800, weaponSlots: 2 },
 ];
 
 // ---- Weapon types ----
