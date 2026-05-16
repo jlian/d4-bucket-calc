@@ -185,7 +185,7 @@ function nakedBaselineCard() {
 
   // Replace the long single-paragraph subtitle with bullet steps + a reference screenshot
   const help = el('details', { class: 'mb-3 text-xs text-zinc-400' });
-  const summary = el('summary', { class: 'cursor-pointer text-zinc-300 select-none' }, 'Getting the right numbers from the stats sheet');
+  const summary = el('summary', { class: 'cursor-pointer text-zinc-300 select-none' }, '⚠️ Getting the right numbers from the stats sheet');
   help.append(summary);
   const body = el('div', { class: 'mt-2 grid sm:grid-cols-[1fr_auto] gap-3 items-start' });
   const steps = el('ol', { class: 'list-decimal list-inside space-y-1 text-zinc-400' });
@@ -321,8 +321,11 @@ function slotBlock(slot: Slot) {
   const isParagon = slot.id === 'paragon';
   const isEmpty = slot.affixes.length === 0 && (!isWeapon || (slot.weaponTypeId ?? 'none') === 'none');
 
-  // Collapsed row for empty non-weapon, non-paragon slots: just a thin label + add button.
-  if (isEmpty && !isWeapon && !isParagon) {
+  // Collapsed row for empty non-weapon, non-paragon, non-armor-gem slots.
+  // Armor-gem slots (helm/chest/pants) always show the expanded view so the user can toggle
+  // gem sockets even when no affixes are entered (e.g., a defense-only chest piece with gems).
+  const isArmorGemSlotEarly = (new Set(['helm', 'chest', 'pants'])).has(slot.id);
+  if (isEmpty && !isWeapon && !isParagon && !isArmorGemSlotEarly) {
     const row = el('div', { class: 'flex items-center justify-between gap-3 py-1.5 px-3 mb-1 border border-zinc-800/60 rounded text-sm hover:border-zinc-700 transition-colors' });
     row.append(el('span', { class: 'text-zinc-500' }, slot.name));
     const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-0.5 rounded border border-amber-700/50' }, '+ Add Affix');
@@ -592,7 +595,8 @@ function scenarioCritOnly(b: Build, scenario: any): number {
 
 // ---------- OUTPUT: Buckets ----------
 function bucketsCard() {
-  const card = sectionCard('Upgrade Priority');
+  const card = sectionCard('Upgrade Priority',
+    'Estimated damage gain from a typical fresh affix of each type, given your current build. Sorted high to low: the top row is your biggest single-slot upgrade.');
 
   const c = calc(build);
   if (c.weaponDmg === 0) {
@@ -651,7 +655,8 @@ function bucketsCard() {
 function statsCard() {
   const c = calc(build);
   const cls = classFor(build);
-  const card = sectionCard('Stats Summary');
+  const card = sectionCard('Stats Summary',
+    'Totals computed from everything you entered: gear, gems, charms, glyphs, baseline stats, and buffs. Use this to sanity-check that your inputs add up to what you see in-game.');
   // Helpers:
   //   bonus(n)  -> "+X.X%" style number for additive/bonus values (matches in-game stats sheet)
   //   ofBase(n) -> total as % of base damage (for final-factor things like Skill Damage / standalone product)
