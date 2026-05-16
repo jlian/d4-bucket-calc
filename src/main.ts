@@ -395,7 +395,13 @@ function slotBlock(slot: Slot) {
     if (isWeaponGemSlot && a.bucket === 'GEM' && WEAPON_GEM_LABELS.includes(a.label)) return true;
     return false;
   };
-  const visibleAffixes = slot.affixes.map((a, i) => ({ a, i })).filter(({ a }) => !isHiddenGemAffix(a));
+  // Old share-links may carry unlabeled GEM-bucket affixes from the legacy dropdown. The GEM
+  // bucket has been removed from the dropdown in favor of dedicated weapon-gem checkbox rows,
+  // so showing those stale rows would expose a bucket type the user can no longer re-add. Hide
+  // them in weapon slots; calc still sums them so damage numbers don't change silently.
+  const isLegacyWeaponGem = (a: { bucket: Bucket; label?: string }) =>
+    isWeaponGemSlot && a.bucket === 'GEM' && !WEAPON_GEM_LABELS.includes(a.label ?? '');
+  const visibleAffixes = slot.affixes.map((a, i) => ({ a, i })).filter(({ a }) => !isHiddenGemAffix(a) && !isLegacyWeaponGem(a));
 
   if (visibleAffixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
 
@@ -459,6 +465,9 @@ function slotBlock(slot: Slot) {
     gemLabels.forEach((gemLabel) => {
       const bucket: Bucket = isArmor ? 'MAINSTAT' : 'GEM';
       const findGem = () => slot.affixes.find(x => x.bucket === bucket && x.label === gemLabel);
+      // Remember the last user-entered value so unchecking + re-checking the gem doesn't reset
+      // it back to defaultValue. Seeded from any existing affix value when the row first renders.
+      let lastValue = findGem()?.value ?? defaultValue;
       const gemRow = el('label', { class: 'flex items-center gap-2 mb-1 cursor-pointer text-sm select-none' });
       const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
       cb.checked = !!findGem();
@@ -471,12 +480,12 @@ function slotBlock(slot: Slot) {
       const prefix = el('span', { class: 'text-zinc-500 text-sm' }, isArmor ? '+' : 'x');
       const input = (isArmor
         ? numInput(
-            () => findGem()?.value ?? defaultValue,
-            v => { const g = findGem(); if (g) g.value = v; },
+            () => findGem()?.value ?? lastValue,
+            v => { lastValue = v; const g = findGem(); if (g) g.value = v; },
             { w: 'w-16 text-right' })
         : pctInput(
-            () => findGem()?.value ?? defaultValue,
-            v => { const g = findGem(); if (g) g.value = v; },
+            () => findGem()?.value ?? lastValue,
+            v => { lastValue = v; const g = findGem(); if (g) g.value = v; },
             { w: 'w-16 text-right' })) as HTMLInputElement;
       const suffix = el('span', { class: 'text-zinc-400 text-sm' }, isArmor
         ? cls.mainStat
@@ -495,14 +504,17 @@ function slotBlock(slot: Slot) {
       cb.addEventListener('change', () => {
         const existing = findGem();
         if (cb.checked && !existing) {
-          slot.affixes.push({ bucket, value: defaultValue, label: gemLabel });
+          // Restore the user's last entered value rather than always resetting to defaultValue.
+          slot.affixes.push({ bucket, value: lastValue, label: gemLabel });
         } else if (!cb.checked && existing) {
+          // Cache the current value before removing so re-checking restores it.
+          lastValue = existing.value;
           slot.affixes.splice(slot.affixes.indexOf(existing), 1);
         }
         applyDisabled();
         input.value = isArmor
-          ? String(findGem()?.value ?? defaultValue)
-          : String((findGem()?.value ?? defaultValue) * 100);
+          ? String(findGem()?.value ?? lastValue)
+          : String((findGem()?.value ?? lastValue) * 100);
         afterInput();
       });
 
@@ -617,6 +629,7 @@ function bucketsCard() {
     { affix: `x10% ${cls.mainStat} Multiplier`,        gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) },
     { affix: '+5% Critical Strike Chance',             gain: weightFor(build, 'CRITCHANCE', 0.05, refScenario), warn: c.critChance >= 1 ? 'capped' : undefined },
     { affix: '+100 Weapon Damage',                     gain: weightFor(build, 'WEPDMG', 100, refScenario) },
+    { affix: 'x10% Weapon Damage',                     gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) },
     { affix: '+3 Skill Ranks',                         gain: weightFor(build, 'SKILLRANK', 3, refScenario) },
   ];
   rows.sort((a, b) => b.gain - a.gain);
@@ -705,7 +718,7 @@ function statsCard() {
   // + Critical Strike Chance
   stats.push(['+% Critical Strike Chance', bonus(c.critChance, 1)]);
   // + Critical Strike Damage (additive, baseline + gear CRITADD combined)
-  if (critDmgAdditive !== 0) stats.push(['+% Critical Strike Damage', bonus(critDmgAdditive)]);
+  if (critDmgAdditive !== 0) stats.push(['+% Critical Strike Damage (crit only)', bonus(critDmgAdditive)]);
   // Other +% damage lines from Baseline Stats (Vulnerable, All, Element, Elites, etc.)
   for (const r of baselineAdditiveRows) stats.push(r);
   // x% multipliers in alphabetical order (matches dropdown). Weapon gem already sums into the
@@ -719,7 +732,7 @@ function statsCard() {
 
   // --- Custom buckets last (matches dropdown order with Custom [+]% / [x]% at end) ---
   if (otherAdditive !== 0) stats.push(['Other additive damage (Custom +%)', bonus(otherAdditive)]);
-  stats.push(['Standalone Multipliers combined (Custom x%)', `×${c.extraMultProduct.toFixed(2)}`]);
+  if (c.extraMultProduct !== 1) stats.push(['Standalone Multipliers combined (Custom x%)', `×${c.extraMultProduct.toFixed(2)}`]);
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
     tbl.append(el('tr', {},
