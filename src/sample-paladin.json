@@ -22,14 +22,20 @@
       "affixes": [
         { "bucket": "CRITCHANCE", "value": 0.21 },
         { "bucket": "SKILLRANK",  "value": 3 },
-        { "bucket": "EXTRAMULT",  "value": 0.8,   "label": "Heir of Perdition x80% damage" }
+        { "bucket": "EXTRAMULT",  "value": 0.8,   "label": "Heir of Perdition x80% damage" },
+        { "bucket": "MAINSTAT",   "value": 100,   "label": "Armor gem" }
       ]
     },
-    { "id": "chest",  "name": "Chest",  "affixes": [] },
+    { "id": "chest",  "name": "Chest",  "affixes": [
+      { "bucket": "MAINSTAT", "value": 100, "label": "Armor gem" }
+    ] },
     {
       "id": "pants",
       "name": "Pants",
-      "affixes": [ { "bucket": "MAINSTAT", "value": 182 } ]
+      "affixes": [
+        { "bucket": "MAINSTAT", "value": 182 },
+        { "bucket": "MAINSTAT", "value": 100, "label": "Armor gem" }
+      ]
     },
     {
       "id": "boots",

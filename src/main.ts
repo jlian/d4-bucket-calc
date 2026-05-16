@@ -366,6 +366,35 @@ function slotBlock(slot: Slot) {
   header.append(addBtn);
   wrap.append(header);
 
+  // Armor gems live on helm, chest, and pants. The in-game socket reads as a + Main Stat affix
+  // and is easy to forget when filling the form, so we pin a small dedicated input. The value is
+  // stored as a normal MAINSTAT affix with a known label so we can find/update it idempotently.
+  const ARMOR_GEM_SLOTS = new Set(['helm', 'chest', 'pants']);
+  if (ARMOR_GEM_SLOTS.has(slot.id)) {
+    const cls = classFor(build);
+    const GEM_LABEL = 'Armor gem';
+    const gemRow = el('div', { class: 'flex items-center gap-2 mb-2 pb-2 border-b border-zinc-800/60' });
+    gemRow.append(el('div', { class: 'flex-1 text-xs text-zinc-400' },
+      `Armor Gem (+ ${cls.mainStat})`,
+      el('span', { class: 'text-zinc-600 ml-1', title: 'Sockets a Royal/Grand gem for your main stat. Typical endgame roll is +80 to +120.' }, 'ⓘ'),
+    ));
+    gemRow.append(numInput(
+      () => slot.affixes.find(a => a.bucket === 'MAINSTAT' && a.label === GEM_LABEL)?.value ?? 0,
+      v => {
+        const existing = slot.affixes.find(a => a.bucket === 'MAINSTAT' && a.label === GEM_LABEL);
+        if (existing) {
+          if (v === 0) slot.affixes.splice(slot.affixes.indexOf(existing), 1);
+          else existing.value = v;
+        } else if (v !== 0) {
+          slot.affixes.push({ bucket: 'MAINSTAT', value: v, label: GEM_LABEL });
+        }
+      },
+      { w: 'w-24 text-right' },
+    ));
+    gemRow.append(el('span', { class: 'text-zinc-600 text-xs w-3 inline-block' }, ''));
+    wrap.append(gemRow);
+  }
+
   // (Removed weaponAvgDamage input. The hardcoded baseline + WEPDMG affix already matches the in-game tooltip.)
 
   if (slot.affixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
@@ -540,7 +569,7 @@ function bucketsCard() {
 
   // "How buckets work" at the bottom, expanded by default.
   card.append(el('details', { class: 'mt-4 text-xs text-zinc-500 border border-zinc-800/60 rounded p-2', open: '' },
-    el('summary', { class: 'cursor-pointer text-zinc-400 select-none' }, 'How buckets work'),
+    el('summary', { class: 'cursor-pointer text-zinc-400 select-none' }, 'Why some affixes are worth more than others'),
     el('div', { class: 'mt-2 text-zinc-400 space-y-2' },
       el('p', {}, 'Same-named affixes ', el('strong', {}, 'sum into one bucket'), '; the bucket then multiplies into the damage formula. A small bucket gains more from a new affix than a big one.'),
       el('p', {}, 'Example: CSDM bucket at +150% (×2.50). Adding x10% → +160% (×2.60). Damage gain = 2.60 / 2.50 = +4%. If your Vulnerable bucket only had +20% (×1.20), same +10% affix goes to ×1.30 → +8.3%, twice as good.'),
