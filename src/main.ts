@@ -555,26 +555,52 @@ function statsCard() {
   const c = calc(build);
   const cls = classFor(build);
   const card = sectionCard('Stats Summary');
-  // Render every multiplier-style value as a flat percentage of base damage, no +/× prefixes.
-  // e.g. an internal multiplier of 3.588 renders as "358.8%".
-  const pct = (mult: number, digits = 1) => `${(mult * 100).toFixed(digits)}%`;
-  // Additive bucket is scenario-dependent; use the same scenario the Damage readout is using
-  // so the value here matches what's being applied. Render as the bucket multiplier (1 + A),
-  // so e.g. +950% additive shows up as "1050%".
-  const addBucket = additiveForScenario(build, { ...scenarioState });
-  const addCrit = critOnlyAdditive(build);
+  // Bonus-only percentage display, matching the in-game stats sheet's "+X%" style.
+  // For internal multipliers stored as (1 + bonus), we show `bonus * 100%`.
+  const pct = (bonus: number, digits = 1) => `${(bonus * 100).toFixed(digits)}%`;
+
+  // Mainstat: total stat value and the % main-stat multiplier on top (e.g. shield's "x50% Strength").
+  const mainStatPctSum = build.slots.reduce((s, slot) =>
+    s + slot.affixes.filter(a => a.bucket === 'MAINSTAT_PCT').reduce((ss, a) => ss + a.value, 0), 0);
+
+  // Additive: per-default-line value (shown only if non-zero), plus "Other additive" combining
+  // ADDITIVE slot affixes (which we render in the "Other additive lines" section of Baseline Stats).
+  // We don't filter by scenario here; the user wants the bonus values they entered, not the active subset.
+  const additiveRows: [string, string][] = [];
+  for (const l of build.additiveLines) {
+    if (l.value === 0) continue;
+    const isCrit = l.isCritOnly;
+    additiveRows.push([
+      l.label + (isCrit ? ' (crit only)' : ''),
+      pct(l.value),
+    ]);
+  }
+  const otherAdditive = build.slots.reduce((s, slot) =>
+    s + slot.affixes.filter(a => a.bucket === 'ADDITIVE').reduce((ss, a) => ss + a.value, 0), 0);
+  if (otherAdditive !== 0) additiveRows.push(['Other additive damage', pct(otherAdditive)]);
+  const critAddFromGear = build.slots.reduce((s, slot) =>
+    s + slot.affixes.filter(a => a.bucket === 'CRITADD').reduce((ss, a) => ss + a.value, 0), 0);
+  if (critAddFromGear !== 0) additiveRows.push(['Critical Strike Damage (from gear, crit only)', pct(critAddFromGear)]);
+
+  // Standalone aspect/unique multipliers: render as bonus over base.
+  const extraMultBonus = c.extraMultProduct - 1;
+
+  // Order mirrors the affix dropdown (BUCKET_ORDER): weapon, mainstat, skill, additive, crit chance,
+  // crit dmg mult, vuln, all/elem, standalone.
   const stats: [string, string][] = [
     ['Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : 'pick weapon'],
-    [`${cls.mainStat} (total)`, `${fmtNum(c.mainStatSum)} → ${pct(c.mainStatMult, 1)} multiplier`],
-    ['Skill Damage', `${pct(c.skillCoef)} (${c.totalSkillRanks} ranks)`],
-    ['Critical Strike Chance', pct(c.critChance, 1)],
-    ['Additive bucket (hit)', `${pct(1 + addBucket)} of base`],
-    ['Additive bucket (crit)', `${pct(1 + addBucket + addCrit)} of base`],
-    ['Critical Strike Damage Mult', pct(c.csdm)],
-    ['Vulnerable Damage Mult', pct(c.vdm)],
-    ['All / Element Damage Mult', pct(c.allm)],
-    ['Standalone % product', pct(c.extraMultProduct)],
+    [cls.mainStat, fmtNum(c.mainStatSum)],
+    [`${cls.mainStat} Multiplier`, pct(mainStatPctSum)],
+    ['Skill Ranks', String(c.totalSkillRanks)],
+    ['Skill Damage', pct(c.skillCoef - 1)],
   ];
+  // Insert additive rows after skill damage so they read like the stats sheet's additive block.
+  for (const r of additiveRows) stats.push(r);
+  stats.push(['Critical Strike Chance', pct(c.critChance, 1)]);
+  stats.push(['Critical Strike Damage Multiplier', pct(c.csdm - 1)]);
+  stats.push(['Vulnerable Damage Multiplier', pct(c.vdm - 1)]);
+  stats.push(['All / Element Damage Multiplier', pct(c.allm - 1)]);
+  stats.push(['Standalone Multipliers (combined)', pct(extraMultBonus)]);
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
     tbl.append(el('tr', {},
