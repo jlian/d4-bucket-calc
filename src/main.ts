@@ -268,7 +268,7 @@ function slotsCard() {
 
 function charmsCard() {
   const card = sectionCard('Charms, Seal & Set Bonus',
-    '6 charm slots, the Horadric Seal, and a dedicated Set Bonus row. Each carries affixes that go into damage buckets. For set bonuses (e.g., 5pc Disciple x500% damage), use the x% Standalone Multiplier (aspect/unique) bucket type on the Set Bonus row so it isn\u2019t tied to a specific charm.');
+    '6 charm slots, the Horadric Seal, and a dedicated Set Bonus row. Each carries affixes that go into damage buckets. For set bonuses (e.g., 5pc Disciple x500% damage), use the Custom [x]% bucket on the Set Bonus row so it isn\u2019t tied to a specific charm.');
   const order = ['charm1','charm2','charm3','charm4','charm5','charm6','seal','setBonus'];
   for (const id of order) {
     const slot = build.slots.find(s => s.id === id);
@@ -279,7 +279,7 @@ function charmsCard() {
 
 function glyphsCard() {
   const card = sectionCard('Glyph Sockets (5 max)',
-    'Each glyph has up to 3 sources of damage: the additive bonus (top), additional bonus (often conditional, ignore if not steady-state), and the legendary bonus (bottom). Enter ONLY the legendary bonus here. The additive parts are already in your naked baseline numbers above.');
+    'Each glyph has up to 3 sources of damage: the additive bonus (top), additional bonus (often conditional, ignore if not steady-state), and the legendary bonus (bottom). Enter ONLY the legendary bonus here. The additive parts are already in the Baseline Stats card above.');
   const order = ['glyph1','glyph2','glyph3','glyph4','glyph5'];
   for (const id of order) {
     const slot = build.slots.find(s => s.id === id);
@@ -292,14 +292,14 @@ function glyphsCard() {
 // Class-aware reminders for the "Other Buffs & Multipliers" card. These are hints, not values:
 // the user must look up the current damage % from their build / patch notes / character sheet.
 const CLASS_HINTS: Record<string, string> = {
-  Paladin: 'Common sources: aura damage bonuses (Conviction, etc.), Holy Bolt synergies, charm/seal multipliers not in their own card, and paragon legendary nodes.',
-  Barbarian: 'Common sources: Walking Arsenal stacks, Berserking, Weapon Expertise rank-10 bonuses, Arsenal-swap aspects, and paragon legendary nodes.',
-  Druid: 'Common sources: form-shift damage (Werewolf / Werebear), Spirit Boon damage bonuses, companion buffs, and paragon legendary nodes.',
-  Necromancer: 'Common sources: curse multipliers (Decrepify, Iron Maiden), Book of the Dead sacrifice bonuses, minion buff aspects, and paragon legendary nodes.',
-  Rogue: 'Common sources: Combo Point bonuses, Inner Sight / Preparation effects, Imbuement multipliers, weapon-specific aspects, and paragon legendary nodes.',
-  Sorcerer: 'Common sources: Devastation, Crackling Energy, element-specific multipliers (Aspect of Control etc.), and paragon legendary nodes.',
-  Spiritborn: 'Common sources: Spirit Hall Primary / Secondary bonuses, Resolve / Ferocity stack multipliers, spirit-tag aspects, and paragon legendary nodes.',
-  Warlock: 'Common sources: curse / hex multipliers, summon buffs, and paragon legendary nodes.',
+  Paladin: 'aura damage bonuses (Conviction, etc.), Holy Bolt synergies, charm/seal multipliers not in their own card, and paragon legendary nodes.',
+  Barbarian: 'Walking Arsenal stacks, Berserking, Weapon Expertise rank-10 bonuses, Arsenal-swap aspects, and paragon legendary nodes.',
+  Druid: 'form-shift damage (Werewolf / Werebear), Spirit Boon damage bonuses, companion buffs, and paragon legendary nodes.',
+  Necromancer: 'curse multipliers (Decrepify, Iron Maiden), Book of the Dead sacrifice bonuses, minion buff aspects, and paragon legendary nodes.',
+  Rogue: 'Combo Point bonuses, Inner Sight / Preparation effects, Imbuement multipliers, weapon-specific aspects, and paragon legendary nodes.',
+  Sorcerer: 'Devastation, Crackling Energy, element-specific multipliers (Aspect of Control etc.), and paragon legendary nodes.',
+  Spiritborn: 'Spirit Hall Primary / Secondary bonuses, Resolve / Ferocity stack multipliers, spirit-tag aspects, and paragon legendary nodes.',
+  Warlock: 'curse / hex multipliers, summon buffs, and paragon legendary nodes.',
 };
 
 function paragonContributionsCard() {
@@ -595,8 +595,7 @@ function scenarioCritOnly(b: Build, scenario: any): number {
 
 // ---------- OUTPUT: Buckets ----------
 function bucketsCard() {
-  const card = sectionCard('Upgrade Priority',
-    'Estimated damage gain from a typical fresh affix of each type, given your current build. Sorted high to low: the top row is your biggest single-slot upgrade.');
+  const card = sectionCard('Upgrade Priority');
 
   const c = calc(build);
   if (c.weaponDmg === 0) {
@@ -623,6 +622,12 @@ function bucketsCard() {
   rows.sort((a, b) => b.gain - a.gain);
 
   const table = el('table', { class: 'w-full text-sm' });
+  table.append(el('thead', {},
+    el('tr', { class: 'text-xs uppercase tracking-wide text-zinc-500 border-b border-zinc-800' },
+      el('th', { class: 'text-left py-1 font-normal' }, 'Affix'),
+      el('th', { class: 'text-right py-1 font-normal whitespace-nowrap pl-2' }, 'Damage Gain'),
+    ),
+  ));
   const tb = el('tbody');
   for (const r of rows) {
     const isHot = r.gain > 0.05, isCold = r.gain < 0.005;
@@ -655,8 +660,7 @@ function bucketsCard() {
 function statsCard() {
   const c = calc(build);
   const cls = classFor(build);
-  const card = sectionCard('Stats Summary',
-    'Totals computed from everything you entered: gear, gems, charms, glyphs, baseline stats, and buffs. Use this to sanity-check that your inputs add up to what you see in-game.');
+  const card = sectionCard('Stats Summary');
   // Helpers:
   //   bonus(n)  -> "+X.X%" style number for additive/bonus values (matches in-game stats sheet)
   //   ofBase(n) -> total as % of base damage (for final-factor things like Skill Damage / standalone product)
@@ -715,7 +719,7 @@ function statsCard() {
 
   // --- Custom buckets last (matches dropdown order with Custom [+]% / [x]% at end) ---
   if (otherAdditive !== 0) stats.push(['Other additive damage (Custom +%)', bonus(otherAdditive)]);
-  stats.push(['Standalone Multipliers combined (Custom x%)', ofBase(c.extraMultProduct)]);
+  stats.push(['Standalone Multipliers combined (Custom x%)', `×${c.extraMultProduct.toFixed(2)}`]);
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
     tbl.append(el('tr', {},
@@ -730,7 +734,7 @@ function statsCard() {
 // ---------- Footer: formula card (KaTeX rendered) ----------
 function formulaCard() {
   const card = el('section', { class: 'bg-zinc-900/30 border border-zinc-800 rounded-lg p-6 text-sm text-zinc-300' });
-  card.append(el('h2', { class: 'text-base font-bold text-amber-400 mb-3' }, 'How the formula works'));
+  card.append(el('h2', { class: 'text-sm font-semibold text-zinc-300 uppercase tracking-wide mb-3' }, 'How the formula works'));
   card.append(el('p', { class: 'mb-4' },
     'D4 damage is a single product of factors. Each factor (a "bucket") is either a sum of additive % values or a single multiplier. The marginal value of an affix is approximately ',
     katexInline('\\Delta / B'), ', where ', katexInline('B'), ' is the bucket\'s current value. Smaller buckets give bigger gains: at sizes ',
