@@ -427,10 +427,6 @@ function scenariosCard() {
   const toggles: { key: keyof typeof scenarioState; label: string }[] = [
     { key: 'vulnerable', label: 'Vulnerable' },
     { key: 'elites',     label: 'Elite' },
-    { key: 'close',      label: 'Close' },
-    { key: 'distant',    label: 'Distant' },
-    { key: 'cc',         label: 'CC’d' },
-    { key: 'healthy',    label: 'Healthy' },
   ];
   for (const t of toggles) {
     const lbl = el('label', { class: 'flex items-center gap-1 text-xs text-zinc-400 cursor-pointer' });
