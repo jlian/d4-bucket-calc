@@ -135,7 +135,7 @@ function renderHeader() {
       el('div', { class: 'flex items-center gap-3' },
         el('span', { class: 'text-2xl' }, '⚔️'),
         el('div', {},
-          el('h1', { class: 'text-lg font-bold leading-tight' }, 'D4 Damage Calc'),
+          el('h1', { class: 'text-lg font-bold leading-tight' }, 'Diablo 4 (Lord of Hatred) Damage Calculator'),
           el('div', { class: 'text-[10px] text-zinc-500 leading-tight' },
             'Calculator design + math by ',
             Object.assign(el('a', { href: 'https://www.youtube.com/@avarilyn', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'Avarilyn' }),
