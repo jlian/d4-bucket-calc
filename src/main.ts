@@ -288,78 +288,27 @@ function glyphsCard() {
   return card;
 }
 
-type ClassPreset = { label: string; bucket: Bucket; value: number; full?: string };
 
-const CLASS_PRESETS: Record<string, ClassPreset[]> = {
-  Paladin: [
-    { label: 'Aura: Conviction (x10% all damage)', bucket: 'EXTRAMULT', value: 0.10 },
-    { label: 'Aura: Fanaticism (x10% attack speed translated)', bucket: 'EXTRAMULT', value: 0.10 },
-  ],
-  Barbarian: [
-    { label: 'Walking Arsenal (3 stacks: 1.10³ ≈ x33%)', bucket: 'EXTRAMULT', value: 0.331 },
-    { label: 'Berserking active (x25% damage)', bucket: 'EXTRAMULT', value: 0.25 },
-    { label: 'Weapon Mastery (Expertise rank 10 bonus)', bucket: 'ADDITIVE', value: 0.15 },
-  ],
-  Druid: [
-    { label: 'Werewolf form bonus damage (x20% to skills)', bucket: 'EXTRAMULT', value: 0.20 },
-    { label: 'Spirit Boon: Iron Feather / Calm Before the Storm', bucket: 'CRITADD', value: 0.10 },
-  ],
-  Necromancer: [
-    { label: 'Decrepify curse (x15% damage)', bucket: 'EXTRAMULT', value: 0.15 },
-    { label: 'Book of the Dead sacrifice (+15% damage vs Vulnerable)', bucket: 'ADDITIVE', value: 0.15 },
-  ],
-  Rogue: [
-    { label: 'Combo Point 3 (additive +30%)', bucket: 'ADDITIVE', value: 0.30 },
-    { label: 'Inner Sight unlimited energy (+25% damage)', bucket: 'ADDITIVE', value: 0.25 },
-    { label: 'Exploit Weakness (x40% Vulnerable)', bucket: 'VDM', value: 0.40 },
-  ],
-  Sorcerer: [
-    { label: 'Devastation passive (x15% damage)', bucket: 'EXTRAMULT', value: 0.15 },
-    { label: 'Crackling Energy (additive +25%)', bucket: 'ADDITIVE', value: 0.25 },
-    { label: 'Aspect of Control (x30% vs CC’d)', bucket: 'EXTRAMULT', value: 0.30 },
-  ],
-  Spiritborn: [
-    { label: 'Jaguar Primary spirit (≈x25% averaged 4th-hit bonus)', bucket: 'EXTRAMULT', value: 0.25 },
-    { label: 'Resolve stacks (x10% per stack, average uptime)', bucket: 'EXTRAMULT', value: 0.20 },
-    { label: 'Eagle Secondary (assumes 4%/4m crit uptime)', bucket: 'CRITCHANCE', value: 0.04 },
-  ],
-  Warlock: [
-    { label: 'Curse stacks (x20% damage to cursed)', bucket: 'EXTRAMULT', value: 0.20 },
-    { label: 'Hex empowered (additive +25%)', bucket: 'ADDITIVE', value: 0.25 },
-  ],
+// Class-aware reminders for the "Other Buffs & Multipliers" card. These are hints, not values:
+// the user must look up the current damage % from their build / patch notes / character sheet.
+const CLASS_HINTS: Record<string, string> = {
+  Paladin: 'Common sources: aura damage bonuses (Conviction, etc.), Holy Bolt synergies, charm/seal multipliers not in their own card, and paragon legendary nodes.',
+  Barbarian: 'Common sources: Walking Arsenal stacks, Berserking, Weapon Expertise rank-10 bonuses, Arsenal-swap aspects, and paragon legendary nodes.',
+  Druid: 'Common sources: form-shift damage (Werewolf / Werebear), Spirit Boon damage bonuses, companion buffs, and paragon legendary nodes.',
+  Necromancer: 'Common sources: curse multipliers (Decrepify, Iron Maiden), Book of the Dead sacrifice bonuses, minion buff aspects, and paragon legendary nodes.',
+  Rogue: 'Common sources: Combo Point bonuses, Inner Sight / Preparation effects, Imbuement multipliers, weapon-specific aspects, and paragon legendary nodes.',
+  Sorcerer: 'Common sources: Devastation, Crackling Energy, element-specific multipliers (Aspect of Control etc.), and paragon legendary nodes.',
+  Spiritborn: 'Common sources: Spirit Hall Primary / Secondary bonuses, Resolve / Ferocity stack multipliers, spirit-tag aspects, and paragon legendary nodes.',
+  Warlock: 'Common sources: curse / hex multipliers, summon buffs, and paragon legendary nodes.',
 };
 
 function paragonContributionsCard() {
+  const baseSubtitle = 'Anything that contributes damage outside of gear, charms, glyphs, and the stats sheet. Skills, paragon nodes, key passives, class mechanics, auras, sacrifices, and similar. Add one row per source. Skip anything whose % already shows up on the stats sheet, it\u2019s already counted above.';
+  const hint = CLASS_HINTS[build.classId];
   const card = sectionCard('Other Buffs & Multipliers',
-    'Anything that contributes damage outside of gear/charms/glyphs: paragon legendary nodes, key passives, class mechanics, auras, sacrifices, etc. Add a row per source. (Pure additive % bonuses that show up on the stats sheet are already counted above; only add things that aren’t.)');
+    hint ? `${baseSubtitle} ${hint}` : baseSubtitle);
   const slot = build.slots.find(s => s.id === 'paragon');
-  if (!slot) return card;
-
-  // Class-specific preset chips: one-click to add a common multiplier / passive for the current class.
-  const presets = CLASS_PRESETS[build.classId];
-  if (presets && presets.length) {
-    const presetWrap = el('div', { class: 'mb-3 flex flex-wrap gap-1.5' });
-    presetWrap.append(el('span', { class: 'text-xs text-zinc-500 self-center mr-1' }, `Quick add (${build.classId}):`));
-    for (const p of presets) {
-      // Skip if a row with the same label already exists (idempotent).
-      const existing = slot.affixes.find(a => a.label === p.label);
-      const btn = el('button', {
-        class: 'text-xs px-2 py-0.5 rounded border ' + (existing
-          ? 'border-zinc-800 text-zinc-600 cursor-not-allowed'
-          : 'border-amber-700/50 text-amber-400 hover:border-amber-500 hover:text-amber-300'),
-        title: existing ? 'Already added' : `Adds: ${p.bucket} ${p.value}`,
-      }, `+ ${p.label}`);
-      if (!existing) btn.addEventListener('click', () => {
-        slot.affixes.push({ bucket: p.bucket, value: p.value, label: p.label });
-        afterInput();
-        mount();
-      });
-      presetWrap.append(btn);
-    }
-    card.append(presetWrap);
-  }
-
-  card.append(slotBlock(slot));
+  if (slot) card.append(slotBlock(slot));
   return card;
 }
 
