@@ -93,6 +93,7 @@
       "weaponTypeId": "shield",
       "affixes": [
         { "bucket": "WEPDMG_PCT", "value": 1.0, "label": "Herald of Zakarum +100% main hand weapon damage" },
+        { "bucket": "MAINSTAT_PCT", "value": 0.5, "label": "Herald of Zakarum x50% Strength" },
         { "bucket": "MAINSTAT",     "value": 210 },
         { "bucket": "CRITCHANCE",   "value": 0.075 }
       ]

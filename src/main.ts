@@ -252,7 +252,7 @@ const GLYPH_IDS = new Set(['glyph1', 'glyph2', 'glyph3', 'glyph4', 'glyph5']);
 
 function slotsCard() {
   const card = sectionCard('Gear Slots',
-    'For each equipped item, pick the weapon type (weapons only) and add its affixes.');
+    'Equipped armor, jewelry, and weapons. Add each item’s affixes (and pick a weapon type on weapon slots). Charms, the seal, glyphs, and the set bonus live in their own cards below.');
   const cls = classFor(build);
   const weaponSlotCount = cls.weaponSlots;
   for (const slot of build.slots) {
