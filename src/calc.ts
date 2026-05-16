@@ -95,6 +95,7 @@ export const DEFAULT_SLOTS: Slot[] = [
   { id: 'charm5',  name: 'Charm 5', affixes: [] },
   { id: 'charm6',  name: 'Charm 6', affixes: [] },
   { id: 'seal',    name: 'Horadric Seal', affixes: [] },
+  { id: 'setBonus', name: 'Set Bonus', affixes: [] },
   // Glyphs (5 max for Paladin/most classes)
   { id: 'glyph1',  name: 'Glyph 1', affixes: [] },
   { id: 'glyph2',  name: 'Glyph 2', affixes: [] },

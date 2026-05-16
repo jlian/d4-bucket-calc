@@ -1,50 +1,13 @@
 {
   "classId": "Paladin",
   "baseMainStat": 766,
-  "extraMainStat": 0,
   "additiveLines": [
-    {
-      "id": "crit",
-      "value": 3.337
-    },
-    {
-      "id": "vulnerable",
-      "value": 0.313
-    },
-    {
-      "id": "all",
-      "value": 0.95
-    },
-    {
-      "id": "primaryElem",
-      "value": 0.517
-    },
-    {
-      "id": "ultimate",
-      "value": 0
-    },
-    {
-      "id": "close",
-      "value": 0
-    },
-    {
-      "id": "distant",
-      "value": 0
-    },
-    {
-      "id": "elites",
-      "value": 0.45
-    },
-    {
-      "id": "cc",
-      "value": 0.275
-    },
-    {
-      "id": "healthy",
-      "value": 0
-    }
+    { "id": "crit",        "value": 3.337 },
+    { "id": "vulnerable",  "value": 0.313 },
+    { "id": "all",         "value": 0.95 },
+    { "id": "primaryElem", "value": 0.517 },
+    { "id": "elites",      "value": 0.45 }
   ],
-  "skillName": "Blessed Hammer",
   "skillDamagePct": 1.15,
   "totalSkillRanks": 15,
   "baseCritChance": 0.058,
@@ -57,167 +20,71 @@
       "id": "helm",
       "name": "Helm",
       "affixes": [
-        {
-          "bucket": "CRITCHANCE",
-          "value": 0.21
-        },
-        {
-          "bucket": "SKILLRANK",
-          "value": 3
-        },
-        {
-          "bucket": "EXTRAMULT",
-          "value": 0.8,
-          "label": "Heir of Perdition x80% damage"
-        }
+        { "bucket": "CRITCHANCE", "value": 0.21 },
+        { "bucket": "SKILLRANK",  "value": 3 },
+        { "bucket": "EXTRAMULT",  "value": 0.8,   "label": "Heir of Perdition x80% damage" }
       ]
     },
-    {
-      "id": "chest",
-      "name": "Chest",
-      "affixes": []
-    },
+    { "id": "chest",  "name": "Chest",  "affixes": [] },
     {
       "id": "pants",
       "name": "Pants",
-      "affixes": [
-        {
-          "bucket": "MAINSTAT",
-          "value": 182
-        }
-      ]
+      "affixes": [ { "bucket": "MAINSTAT", "value": 182 } ]
     },
     {
       "id": "boots",
       "name": "Boots",
-      "affixes": [
-        {
-          "bucket": "MAINSTAT",
-          "value": 137
-        }
-      ]
+      "affixes": [ { "bucket": "MAINSTAT", "value": 137 } ]
     },
     {
       "id": "gloves",
       "name": "Gloves",
       "affixes": [
-        {
-          "bucket": "CRITCHANCE",
-          "value": 0.106
-        },
-        {
-          "bucket": "CSDM",
-          "value": 0.6
-        },
-        {
-          "bucket": "ALLM",
-          "value": 0.2
-        },
-        {
-          "bucket": "SKILLRANK",
-          "value": 6
-        },
-        {
-          "bucket": "CRITADD",
-          "value": 0.63
-        },
-        {
-          "bucket": "EXTRAMULT",
-          "value": 0.56,
-          "label": "Lagera's Sovereignty x56% Disciple"
-        }
+        { "bucket": "CRITCHANCE", "value": 0.106 },
+        { "bucket": "CSDM",       "value": 0.6 },
+        { "bucket": "ALLM",       "value": 0.2 },
+        { "bucket": "SKILLRANK",  "value": 6 },
+        { "bucket": "CRITADD",    "value": 0.63 },
+        { "bucket": "EXTRAMULT",  "value": 0.56, "label": "Lagera's Sovereignty x56% Disciple" }
       ]
     },
     {
       "id": "amulet",
       "name": "Amulet",
       "affixes": [
-        {
-          "bucket": "ALLM",
-          "value": 0.21
-        },
-        {
-          "bucket": "CRITCHANCE",
-          "value": 0.106
-        },
-        {
-          "bucket": "VDM",
-          "value": 0.2
-        },
-        {
-          "bucket": "CSDM",
-          "value": 1.0
-        },
-        {
-          "bucket": "EXTRAMULT",
-          "value": 0.674,
-          "label": "Eagle's Eye x87% CSD * 77.5% block"
-        }
+        { "bucket": "ALLM",       "value": 0.21 },
+        { "bucket": "CRITCHANCE", "value": 0.106 },
+        { "bucket": "VDM",        "value": 0.2 },
+        { "bucket": "CSDM",       "value": 1.0 },
+        { "bucket": "EXTRAMULT",  "value": 0.674, "label": "Eagle's Eye x87% CSD * 77.5% block" }
       ]
     },
     {
       "id": "ring1",
       "name": "Ring 1",
       "affixes": [
-        {
-          "bucket": "CRITCHANCE",
-          "value": 0.215
-        },
-        {
-          "bucket": "SKILLRANK",
-          "value": 3
-        },
-        {
-          "bucket": "CSDM",
-          "value": 0.5
-        }
+        { "bucket": "CRITCHANCE", "value": 0.215 },
+        { "bucket": "SKILLRANK",  "value": 3 },
+        { "bucket": "CSDM",       "value": 0.5 }
       ]
     },
     {
       "id": "ring2",
       "name": "Ring 2",
-      "affixes": [
-        {
-          "bucket": "MAINSTAT",
-          "value": 151
-        }
-      ]
+      "affixes": [ { "bucket": "MAINSTAT", "value": 151 } ]
     },
     {
       "id": "wep1",
       "name": "Weapon 1",
       "weaponTypeId": "1h_mace",
       "affixes": [
-        {
-          "bucket": "WEPDMG",
-          "value": 161
-        },
-        {
-          "bucket": "MAINSTAT",
-          "value": 220
-        },
-        {
-          "bucket": "CSDM",
-          "value": 0.21
-        },
-        {
-          "bucket": "ALLM",
-          "value": 0.13
-        },
-        {
-          "bucket": "CRITCHANCE",
-          "value": 0.1
-        },
-        {
-          "bucket": "GEM",
-          "value": 0.24,
-          "label": "Royal weapon gem"
-        },
-        {
-          "bucket": "EXTRAMULT",
-          "value": 0.98,
-          "label": "Herald's Morningstar x98% Blessed Hammer"
-        }
+        { "bucket": "WEPDMG",     "value": 161 },
+        { "bucket": "MAINSTAT",   "value": 220 },
+        { "bucket": "CSDM",       "value": 0.21 },
+        { "bucket": "ALLM",       "value": 0.13 },
+        { "bucket": "CRITCHANCE", "value": 0.1 },
+        { "bucket": "GEM",        "value": 0.24, "label": "Royal weapon gem" },
+        { "bucket": "EXTRAMULT",  "value": 0.98, "label": "Herald's Morningstar x98% Blessed Hammer" }
       ]
     },
     {
@@ -225,184 +92,84 @@
       "name": "Weapon 2",
       "weaponTypeId": "shield",
       "affixes": [
-        {
-          "bucket": "MAINSTAT_PCT",
-          "value": 0.5,
-          "label": "Herald of Zakarum x50% Strength"
-        },
-        {
-          "bucket": "MAINSTAT",
-          "value": 210
-        },
-        {
-          "bucket": "CRITCHANCE",
-          "value": 0.075
-        }
+        { "bucket": "MAINSTAT_PCT", "value": 0.5, "label": "Herald of Zakarum x50% Strength" },
+        { "bucket": "MAINSTAT",     "value": 210 },
+        { "bucket": "CRITCHANCE",   "value": 0.075 }
       ]
     },
-    {
-      "id": "wep3",
-      "name": "Weapon 3",
-      "weaponTypeId": "none",
-      "affixes": []
-    },
-    {
-      "id": "wep4",
-      "name": "Weapon 4",
-      "weaponTypeId": "none",
-      "affixes": []
-    },
+    { "id": "wep3", "name": "Weapon 3", "weaponTypeId": "none", "affixes": [] },
+    { "id": "wep4", "name": "Weapon 4", "weaponTypeId": "none", "affixes": [] },
     {
       "id": "paragon",
       "name": "Paragon Nodes",
       "affixes": [
-        {
-          "bucket": "EXTRAMULT",
-          "value": 0.9,
-          "label": "Beacon \u2014 ally/merc near"
-        },
-        {
-          "bucket": "EXTRAMULT",
-          "value": 0.8,
-          "label": "Relentless \u2014 while moving"
-        },
-        {
-          "bucket": "EXTRAMULT",
-          "value": 0.852,
-          "label": "Shield Bearer \u2014 110% of 77.5% block"
-        },
-        {
-          "bucket": "EXTRAMULT",
-          "value": 1.0,
-          "label": "Castle \u2014 125% of armor DR"
-        }
+        { "bucket": "EXTRAMULT", "value": 0.9,   "label": "Beacon (ally/merc near)" },
+        { "bucket": "EXTRAMULT", "value": 0.8,   "label": "Relentless (while moving)" },
+        { "bucket": "EXTRAMULT", "value": 0.852, "label": "Shield Bearer (110% of 77.5% block)" },
+        { "bucket": "EXTRAMULT", "value": 1.0,   "label": "Castle (125% of armor DR)" }
       ]
     },
     {
       "id": "charm1",
       "name": "Charm 1",
-      "affixes": [
-        {
-          "bucket": "CRITADD",
-          "value": 0.45,
-          "label": "Griswold's +45% CSD at max stacks"
-        }
-      ]
+      "affixes": [ { "bucket": "CRITADD", "value": 0.45, "label": "Griswold's +45% CSD at max stacks" } ]
     },
     {
       "id": "charm2",
       "name": "Charm 2",
-      "affixes": [
-        {
-          "bucket": "MAINSTAT",
-          "value": 87,
-          "label": "Phoba +87 all stats"
-        }
-      ]
+      "affixes": [ { "bucket": "MAINSTAT", "value": 87, "label": "Phoba +87 all stats" } ]
     },
     {
       "id": "charm3",
       "name": "Charm 3",
-      "affixes": [
-        {
-          "bucket": "SKILLRANK",
-          "value": 3,
-          "label": "Beru +3 Disciple Skills"
-        }
-      ]
+      "affixes": [ { "bucket": "SKILLRANK", "value": 3, "label": "Beru +3 Disciple Skills" } ]
     },
     {
       "id": "charm4",
       "name": "Charm 4",
-      "affixes": [
-        {
-          "bucket": "SKILLRANK",
-          "value": 3,
-          "label": "Linta +2 Disciple Skills"
-        }
-      ]
+      "affixes": [ { "bucket": "SKILLRANK", "value": 3, "label": "Linta +2 Disciple Skills" } ]
     },
     {
       "id": "charm5",
       "name": "Charm 5",
-      "affixes": [
-        {
-          "bucket": "SKILLRANK",
-          "value": 3,
-          "label": "Mlor +3 Disciple Skills"
-        }
-      ]
+      "affixes": [ { "bucket": "SKILLRANK", "value": 3, "label": "Mlor +3 Disciple Skills" } ]
     },
     {
       "id": "charm6",
       "name": "Charm 6",
-      "affixes": [
-        {
-          "bucket": "MAINSTAT",
-          "value": 84,
-          "label": "Fer +84 all stats"
-        },
-        {
-          "bucket": "EXTRAMULT",
-          "value": 5.0,
-          "label": "Light's Epiphany 5pc \u2014 x500% Disciple damage"
-        }
-      ]
+      "affixes": [ { "bucket": "MAINSTAT", "value": 84, "label": "Fer +84 all stats" } ]
     },
     {
       "id": "seal",
       "name": "Horadric Seal",
+      "affixes": [ { "bucket": "MAINSTAT", "value": 100, "label": "Seal +7% all stats (approx +100 Str)" } ]
+    },
+    {
+      "id": "setBonus",
+      "name": "Set Bonus",
       "affixes": [
-        {
-          "bucket": "MAINSTAT",
-          "value": 100,
-          "label": "Seal +7% all stats (\u2248+100 Str)"
-        }
+        { "bucket": "EXTRAMULT", "value": 5.0, "label": "Light's Epiphany 5pc: x500% Disciple damage" }
       ]
     },
     {
       "id": "glyph1",
       "name": "Glyph 1 (Spirit)",
-      "affixes": [
-        {
-          "bucket": "CSDM",
-          "value": 0.14,
-          "label": "Spirit legendary \u2014 x14% Crit Damage"
-        }
-      ]
+      "affixes": [ { "bucket": "CSDM", "value": 0.14, "label": "Spirit legendary: x14% Crit Damage" } ]
     },
     {
       "id": "glyph2",
       "name": "Glyph 2 (Honed)",
-      "affixes": [
-        {
-          "bucket": "CSDM",
-          "value": 0.138,
-          "label": "Honed legendary \u2014 x13.8% Crit Damage"
-        }
-      ]
+      "affixes": [ { "bucket": "CSDM", "value": 0.138, "label": "Honed legendary: x13.8% Crit Damage" } ]
     },
     {
       "id": "glyph3",
       "name": "Glyph 3 (Canny)",
-      "affixes": [
-        {
-          "bucket": "ALLM",
-          "value": 0.094,
-          "label": "Canny legendary \u2014 x9.4% Non-Physical"
-        }
-      ]
+      "affixes": [ { "bucket": "ALLM", "value": 0.094, "label": "Canny legendary: x9.4% Non-Physical" } ]
     },
     {
       "id": "glyph4",
       "name": "Glyph 4 (Apostle)",
-      "affixes": [
-        {
-          "bucket": "VDM",
-          "value": 0.104,
-          "label": "Apostle legendary \u2014 x10.4% Vulnerable"
-        }
-      ]
+      "affixes": [ { "bucket": "VDM", "value": 0.104, "label": "Apostle legendary: x10.4% Vulnerable" } ]
     },
     {
       "id": "glyph5",

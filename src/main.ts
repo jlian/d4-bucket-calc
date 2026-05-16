@@ -254,7 +254,7 @@ function nakedBaselineCard() {
 }
 
 // ---------- Card 3: Gear Slots ----------
-const CHARM_IDS = new Set(['charm1', 'charm2', 'charm3', 'charm4', 'charm5', 'charm6', 'seal']);
+const CHARM_IDS = new Set(['charm1', 'charm2', 'charm3', 'charm4', 'charm5', 'charm6', 'seal', 'setBonus']);
 const GLYPH_IDS = new Set(['glyph1', 'glyph2', 'glyph3', 'glyph4', 'glyph5']);
 
 function slotsCard() {
@@ -274,9 +274,9 @@ function slotsCard() {
 }
 
 function charmsCard() {
-  const card = sectionCard('Charms & Seal',
-    '6 charm slots + Horadric Seal. Each can carry affixes that go into damage buckets. Use the x% Standalone Multiplier (aspect/unique) bucket type for things like 5pc set bonuses (e.g., x500% Disciple damage).');
-  const order = ['charm1','charm2','charm3','charm4','charm5','charm6','seal'];
+  const card = sectionCard('Charms, Seal & Set Bonus',
+    '6 charm slots, the Horadric Seal, and a dedicated Set Bonus row. Each carries affixes that go into damage buckets. For set bonuses (e.g., 5pc Disciple x500% damage), use the x% Standalone Multiplier (aspect/unique) bucket type on the Set Bonus row so it isn\u2019t tied to a specific charm.');
+  const order = ['charm1','charm2','charm3','charm4','charm5','charm6','seal','setBonus'];
   for (const id of order) {
     const slot = build.slots.find(s => s.id === id);
     if (slot) card.append(slotBlock(slot));
