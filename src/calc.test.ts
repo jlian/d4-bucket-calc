@@ -10,7 +10,7 @@
 // applies it for vulnerable scenarios. So we set enemyDamageFactor = 0.2 (matching, this is (1-R) where R=0.8) and target
 // a non-vulnerable scenario, then add 0.2 multiplier manually as part of expected.
 //
-// Usage: `npx tsx src/calc.test.ts` — exits 0 on pass, 1 on fail.
+// Usage: `npx tsx src/calc.test.ts`. Exits 0 on pass, 1 on fail.
 
 import { type Build, scenarioDamage, DEFAULT_BUILD } from './calc';
 

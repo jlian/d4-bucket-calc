@@ -189,7 +189,7 @@ export interface Calc {
   totalSkillRanks: number;
   skillCoef: number;
   weaponDmg: number;
-  weaponSpeed: number;        // baseline avg from equipped weapons
+  weaponSpeed: number;        // baseline average from equipped weapons
   effectiveAttackRate: number; // weaponSpeed × (1 + attackSpeedBonus)
   extraMultProduct: number;
 }
@@ -273,7 +273,7 @@ export interface Scenario {
 
 // Compute additive bucket value for a scenario (including extraAdditive + slot ADDITIVE/GEM + applicable lines)
 export function additiveForScenario(b: Build, conditions: ScenarioConditions): number {
-  // Always-on/conditional applicable lines (excluding crit-only — handled separately)
+  // Always-on/conditional applicable lines (excluding crit-only, handled separately)
   let add = 0;
   for (const l of b.additiveLines) {
     if (l.isCritOnly) continue;
@@ -357,7 +357,7 @@ export const BUCKET_ORDER: Bucket[] = ['CSDM','VDM','DOTM','ALLM','NONPHYS','ADD
 
 export function presetScenarios(): Scenario[] {
   return [
-    { id: 'plain',     label: 'Plain hit (avg w/ crit)',    conditions: {} },
+    { id: 'plain',     label: 'Plain hit (average w/ crit)',    conditions: {} },
     { id: 'vuln',      label: 'vs Vulnerable',              conditions: { vulnerable: true } },
     { id: 'elite',     label: 'vs Elite',                   conditions: { elites: true } },
     { id: 'vuln_elite',label: 'vs Vulnerable Elite',        conditions: { vulnerable: true, elites: true } },

@@ -4,7 +4,7 @@ import katex from 'katex';
 import samplePaladin from './sample-paladin.json';
 import {
   calc, classFor, CLASSES, BUCKET_META, BUCKET_ORDER,
-  weightFor, scenarioDamage, scenarioDamageNoCrit, presetScenarios,
+  weightFor, scenarioDamage, scenarioDamageNoCrit,
   additiveForScenario, critOnlyAdditive,
   WEAPON_TYPES, weaponTypeById,
   type Build, type Bucket, type Slot,
@@ -16,7 +16,7 @@ let build: Build = loadInitialBuild();
 const fmtPct = (n: number, digits = 2) => (n * 100).toFixed(digits) + '%';
 const fmtNum = (n: number, digits = 0) => n.toLocaleString('en-US', { maximumFractionDigits: digits });
 const fmtBigNum = (n: number) => {
-  if (!isFinite(n) || n === 0) return '—';
+  if (!isFinite(n) || n === 0) return '0';
   if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
   if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
   if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K';
@@ -353,7 +353,7 @@ function slotBlock(slot: Slot) {
   header.append(addBtn);
   wrap.append(header);
 
-  // (Removed weaponAvgDamage input — the hardcoded baseline + WEPDMG affix already matches the in-game tooltip.)
+  // (Removed weaponAvgDamage input. The hardcoded baseline + WEPDMG affix already matches the in-game tooltip.)
 
   if (slot.affixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
 
@@ -375,7 +375,7 @@ function slotBlock(slot: Slot) {
     sel.addEventListener('change', () => { a.bucket = sel.value as Bucket; mount(); });
     row.append(sel);
 
-    // Optional inline label — shown for buckets where it helps document what the entry is.
+    // Optional inline label, shown for buckets where it helps document what the entry is.
     // Sits between the bucket dropdown and the value so it shares the row instead of wrapping below.
     const labelable = a.bucket === 'EXTRAMULT' || a.bucket === 'ADDITIVE' || a.bucket === 'MAINSTAT_PCT' || a.bucket === 'GEM';
     if (labelable) {
@@ -428,41 +428,32 @@ function scenariosCard() {
     lbl.append(cb, document.createTextNode(t.label));
     toggleWrap.append(lbl);
   }
-  // DoT toggle (lives on the build, not scenarioState, because it changes the whole calc model).
-  {
-    const lbl = el('label', { class: 'flex items-center gap-1 text-xs text-zinc-400 cursor-pointer' });
-    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
-    cb.checked = build.disableCrit;
-    cb.addEventListener('change', () => { build.disableCrit = cb.checked; afterInput(); });
-    lbl.append(cb, document.createTextNode('DoT build (no crit)'));
-    toggleWrap.append(lbl);
-  }
+  // DoT toggle removed: the calculator now always shows the crit/non-crit/average readout.
+  // Conditional DoT affixes need proper modeling, which is out of scope for now.
   card.append(toggleWrap);
 
   // Compute scenarios
   const conds = { ...scenarioState };
-  const scenarioHit:  any = { id: 'hit',  label: 'hit',  conditions: conds };
-  const scenarioDot:  any = { id: 'dot',  label: 'dot',  conditions: conds, isDot: true };
+  const scenarioHit: any = { id: 'hit',  label: 'hit',  conditions: conds };
   const hitDmg = scenarioDamageNoCrit(build, scenarioHit);
-  const critDmg = build.disableCrit ? 0 : scenarioCritOnly(build, scenarioHit);
-  const dotDmg = build.disableCrit ? scenarioDamage(build, scenarioDot) : 0;
+  const critDmg = scenarioCritOnly(build, scenarioHit);
 
   // Big readout (matches in-game: white = hit, yellow = crit)
   const row = el('div', { class: 'grid grid-cols-2 gap-3 mb-1' });
   row.append(el('div', { class: 'text-center' },
     el('div', { class: 'text-xs text-zinc-500' }, 'Hit'),
-    el('div', { class: 'text-2xl font-bold text-zinc-100 font-mono' }, build.disableCrit ? fmtBigNum(dotDmg) : fmtBigNum(hitDmg)),
+    el('div', { class: 'text-2xl font-bold text-zinc-100 font-mono' }, fmtBigNum(hitDmg)),
   ));
   row.append(el('div', { class: 'text-center' },
-    el('div', { class: 'text-xs text-zinc-500' }, build.disableCrit ? 'DoT tick' : 'Crit'),
-    el('div', { class: 'text-2xl font-bold text-amber-400 font-mono' }, build.disableCrit ? fmtBigNum(dotDmg) : fmtBigNum(critDmg)),
+    el('div', { class: 'text-xs text-zinc-500' }, 'Crit'),
+    el('div', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(critDmg)),
   ));
   card.append(row);
 
-  if (!build.disableCrit) {
+  {
     const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
     card.append(el('div', { class: 'text-center text-sm text-zinc-300 mt-1.5' },
-      el('span', { class: 'text-xs text-zinc-500' }, `avg @ ${(c.critChance*100).toFixed(1)}% crit → `),
+      el('span', { class: 'text-xs text-zinc-500' }, `Average @ ${(c.critChance*100).toFixed(1)}% crit → `),
       el('span', { class: 'text-zinc-100 font-mono font-semibold' }, fmtBigNum(avg)),
     ));
   }
@@ -501,9 +492,7 @@ function bucketsCard() {
     return card;
   }
 
-  const refScenario = build.disableCrit
-    ? presetScenarios().find(s => s.id === 'dot')!
-    : { id: 'live', label: 'current scenario', conditions: { ...scenarioState } } as any;
+  const refScenario = { id: 'live', label: 'current scenario', conditions: { ...scenarioState } } as any;
 
   const cls = classFor(build);
   type Row = { affix: string; gain: number; warn?: string };
@@ -556,7 +545,7 @@ function statsCard() {
   const card = sectionCard('Stats Summary');
   const pctOf = (mult: number) => `+${((mult - 1) * 100).toFixed(1)}% (×${mult.toFixed(3)})`;
   const stats: [string, string][] = [
-    ['Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : '— pick weapon'],
+    ['Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : 'pick weapon'],
     [`${cls.mainStat} (total)`, `${fmtNum(c.mainStatSum)} → ×${c.mainStatMult.toFixed(3)} multiplier`],
     ['Skill Damage %', `+${(c.skillCoef * 100).toFixed(1)}% (${c.totalSkillRanks} ranks)`],
     ['Critical Strike Chance', fmtPct(c.critChance, 1)],
@@ -586,7 +575,7 @@ function formulaCard() {
     katexInline('\\Delta / B'), ', where ', katexInline('B'), ' is the bucket\'s current value. Smaller buckets give bigger gains.',
   ));
 
-  // Main formula — use plain symbols, not in-build jargon
+  // Main formula. Use plain symbols, not in-build jargon.
   const divisor = classFor(build).divisor;
   const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (1.5 \cdot M_{crit})^{c} \cdot (1.2 \cdot M_{vuln})^{v} \cdot M_{dot}^{d} \cdot M_{all} \cdot (1 - R)`;
   card.append(el('div', { class: 'my-4 flex justify-center overflow-x-auto' }, katexBlock(formula)));
@@ -627,7 +616,7 @@ function additiveBreakdown(b: Build, conds: any): string {
   let slotAdd = 0;
   for (const slot of b.slots) for (const aa of slot.affixes) if (aa.bucket === 'ADDITIVE') slotAdd += aa.value;
   if (slotAdd > 0) parts.push(`gear/extras ${(slotAdd*100).toFixed(1)}%`);
-  return parts.length ? ` — sum of ${parts.join(', ')}` : '';
+  return parts.length ? ` (sum of ${parts.join(', ')})` : '';
 }
 
 function additiveBreakdownMath(b: Build, conds: any, includeCrit: boolean): string {
@@ -661,7 +650,7 @@ function extraMultMath(b: Build): string {
     if (aa.bucket === 'EXTRAMULT' && aa.value !== 0) factors.push({ label: aa.label || '?', v: 1 + aa.value });
   }
   if (factors.length === 0) return '';
-  // Inline the math — okay even if many factors. Multi-line will wrap in the cell.
+  // Inline the math. Okay even if many factors; multi-line will wrap in the cell.
   return factors.map(f => f.v.toFixed(2)).join(' × ');
 }
 
@@ -676,16 +665,13 @@ function buildPluggedIn(): HTMLElement {
   const cls = classFor(build);
   // Use the same scenario state as the Damage card so user can experiment from one place.
   const conds = { ...scenarioState };
-  const scenario: any = build.disableCrit ? presetScenarios().find(s => s.id === 'dot') : { id: 'live', label: 'crit hit', conditions: conds };
-  const isDot = !!scenario.isDot;
-  const additive = additiveForScenario(build, isDot ? {} : conds);
+  const additive = additiveForScenario(build, conds);
   const critAdd = critOnlyAdditive(build);
-  const vdmFactor = conds.vulnerable && !isDot ? c.vdm * 1.2 : 1;
+  const vdmFactor = conds.vulnerable ? c.vdm * 1.2 : 1;
   const base = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * build.enemyDamageFactor;
   const nonCritDmg = base * (1 + additive);
   const critDmg = base * (1 + additive + critAdd) * c.csdm * 1.5;
-  const dotDmg = base * (1 + additive) * c.dotm;
-  const avgDmg = isDot ? dotDmg : (critDmg * c.critChance + nonCritDmg * (1 - c.critChance));
+  const avgDmg = critDmg * c.critChance + nonCritDmg * (1 - c.critChance);
 
   // Format numbers without comma thousand separators (math notation), with fixed decimals
   const dec = (n: number, d = 2) => n.toFixed(d);
@@ -700,9 +686,8 @@ function buildPluggedIn(): HTMLElement {
     el('th', { class: 'text-right py-1 font-normal pl-3 whitespace-nowrap' }, 'Value'),
   )));
   type Row = [string, string, string, number];
-  const usedAdd = isDot ? additive : (additive + critAdd);
-  const isCritContext = !isDot;
-  const addMath = additiveBreakdownMath(build, conds, isCritContext);
+  const usedAdd = additive + critAdd;
+  const addMath = additiveBreakdownMath(build, conds, true);
   // Skill coef step formula at N total ranks: base × (1 + 0.10 × (N - floor(N/5) - 1) + 0.15 × floor(N/5))
   const N = c.totalSkillRanks;
   const f = Math.floor(N / 5);
@@ -712,21 +697,16 @@ function buildPluggedIn(): HTMLElement {
     : `${dec(build.skillDamagePct)} × 1`;
   const csdmMath = bucketBreakdownMath(build, 'CSDM');
   const vdmMath = bucketBreakdownMath(build, 'VDM');
-  const dotmMath = bucketBreakdownMath(build, 'DOTM');
   const allmMath = bucketBreakdownMath(build, 'ALLM');
   const rows: Row[] = [
     ['W',                       'Average weapon damage from your equipped weapon(s).',                                        '',                                            c.weaponDmg],
-    ['(1 + A)',                 isDot ? 'Sum of all additive damage % bonuses (the giant pool).' : (critAdd > 0 ? 'Additive damage bucket. On a crit, includes the +Crit Damage additive too; non-crit hits use just the base bucket.' : 'Sum of all additive damage % bonuses.'), addMath || `1 + ${dec(usedAdd)}`, 1 + usedAdd],
+    ['(1 + A)',                 critAdd > 0 ? 'Additive damage bucket. On a crit, includes the +Crit Damage additive too; non-crit hits use just the base bucket.' : 'Sum of all additive damage % bonuses.', addMath || `1 + ${dec(usedAdd)}`, 1 + usedAdd],
     [`(1 + S/${cls.divisor})`,  `${cls.mainStat} multiplier. Divisor is ${cls.divisor} for ${build.classId} (Barbarian uses 900, all others 800).`, `1 + ${dec(c.mainStatSum, 0)}/${cls.divisor}`, c.mainStatMult],
     ['C',                       'Skill damage coefficient. Step formula: base × (1 + 0.10·(N - ⌊N/5⌋ - 1) + 0.15·⌊N/5⌋) where N = total ranks. Every multiple of 5 ranks gets a 5% bonus on top.', skillMath, c.skillCoef],
     [String.raw`\prod_i M_i`,    'Product of standalone aspect/unique multipliers. Each one is its own factor.', extraMultMath(build), c.extraMultProduct],
   ];
-  if (!isDot) {
-    rows.push([String.raw`(1.5 \cdot M_{crit})^c`, 'Crit factor: 1.5 inherent crit baseline times the Critical Strike Damage Multiplier bucket. Active only on crit hits (c = 1).', `1.5 × (${csdmMath})`, c.csdm * 1.5]);
-    rows.push([String.raw`(1.2 \cdot M_{vuln})^v`, 'Vulnerable factor: 1.2 inherent vuln baseline times the Vulnerable Damage Multiplier bucket. Active only against vulnerable targets (v = 1).', conds.vulnerable ? `1.2 × (${vdmMath})` : 'inactive (v = 0)', vdmFactor]);
-  } else {
-    rows.push([String.raw`M_{dot}^d`, 'Damage Over Time Multiplier bucket. Active only on DoT ticks (d = 1).', dotmMath, c.dotm]);
-  }
+  rows.push([String.raw`(1.5 \cdot M_{crit})^c`, 'Crit factor: 1.5 inherent crit baseline times the Critical Strike Damage Multiplier bucket. Active only on crit hits (c = 1).', `1.5 × (${csdmMath})`, c.csdm * 1.5]);
+  rows.push([String.raw`(1.2 \cdot M_{vuln})^v`, 'Vulnerable factor: 1.2 inherent vuln baseline times the Vulnerable Damage Multiplier bucket. Active only against vulnerable targets (v = 1).', conds.vulnerable ? `1.2 × (${vdmMath})` : 'inactive (v = 0)', vdmFactor]);
   rows.push(['M_{all}',          'All / Element Damage Multiplier bucket. Includes weapon gem damage which sums into this bucket.', allmMath, c.allm]);
   rows.push(['(1 - R)',          `Enemy damage reduction. R = 0.80 for a level-appropriate enemy / training dummy (80% reduction).`, `1 - 0.80`, build.enemyDamageFactor]);
 
@@ -747,12 +727,10 @@ function buildPluggedIn(): HTMLElement {
   // value below is from internal full-precision math.)
   // Big result (precise, from internal full-precision math)
   wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
-    el('span', { class: 'text-sm text-zinc-300' }, isDot ? 'DoT tick' : `Crit hit damage`),
-    el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(isDot ? dotDmg : critDmg)),
+    el('span', { class: 'text-sm text-zinc-300' }, `Crit hit damage`),
+    el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(critDmg)),
   ));
-  if (!isDot) {
-    wrap.append(el('div', { class: 'text-xs text-zinc-500 mt-2' }, `Avg (with ${(c.critChance*100).toFixed(0)}% crit chance) = ${fmtBigNum(avgDmg)}`));
-  }
+  wrap.append(el('div', { class: 'text-xs text-zinc-500 mt-2' }, `Average (with ${(c.critChance*100).toFixed(0)}% crit chance) = ${fmtBigNum(avgDmg)}`));
   void hi; // unused helper
   return wrap;
 }
