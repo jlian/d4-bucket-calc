@@ -583,10 +583,7 @@ function statsCard() {
   const otherAdditive = sumBucket('ADDITIVE');
 
   // Other bucket totals (only render if non-zero so the card stays scannable).
-  const mainStatPctSum = sumBucket('MAINSTAT_PCT');
-  const wepDmgPctSum = sumBucket('WEPDMG_PCT');
   const nonPhysSum = sumBucket('NONPHYS');
-  const gemSum = sumBucket('GEM');
 
   // Order: computed totals first, then dropdown order (alphabetical by label),
   // then custom buckets (ADDITIVE = "Other additive", EXTRAMULT = "Standalone product") last.
@@ -605,17 +602,14 @@ function statsCard() {
   if (critDmgAdditive !== 0) stats.push(['+% Critical Strike Damage', bonus(critDmgAdditive)]);
   // Other +% damage lines from Baseline Stats (Vulnerable, All, Element, Elites, etc.)
   for (const r of baselineAdditiveRows) stats.push(r);
-  // x% multipliers in alphabetical order (matches dropdown)
+  // x% multipliers in alphabetical order (matches dropdown). Weapon gem already sums into the
+  // ALLM bucket internally, so it's reflected in the All / Element row; no separate gem row needed.
   stats.push(['x% All / Element Damage Multiplier', bonus(c.allm - 1)]);
   stats.push(['x% Critical Strike Damage Multiplier', bonus(c.csdm - 1)]);
   // DoT and Non-Physical only if relevant.
   if (c.dotm > 1) stats.push(['x% Damage Over Time Multiplier', bonus(c.dotm - 1)]);
-  if (mainStatPctSum !== 0) stats.push(['x% Main Stat Multiplier', bonus(mainStatPctSum)]);
   if (nonPhysSum !== 0) stats.push(['x% Non-Physical Damage', bonus(nonPhysSum)]);
   stats.push(['x% Vulnerable Damage Multiplier', bonus(c.vdm - 1)]);
-  if (wepDmgPctSum !== 0) stats.push(['x% Weapon Damage', bonus(wepDmgPctSum)]);
-  // Weapon gem rolls into All / Element; show as informational if any.
-  if (gemSum !== 0) stats.push(['Weapon Gem (in All / Element)', bonus(gemSum)]);
 
   // --- Custom buckets last (matches dropdown order with Custom [+]% / [x]% at end) ---
   if (otherAdditive !== 0) stats.push(['Other additive damage (Custom +%)', bonus(otherAdditive)]);
