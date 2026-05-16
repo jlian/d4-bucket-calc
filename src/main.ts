@@ -182,7 +182,6 @@ function classSkillCard() {
   grid.append(field('Skill Damage % at rank 1 (e.g. 115 for Blessed Hammer)', pctInput(() => build.skillDamagePct, v => build.skillDamagePct = v, { step: 1, w: 'w-full' })));
   grid.append(field('Skill Ranks (naked, usually 15)', numInput(() => build.totalSkillRanks, v => build.totalSkillRanks = v, { w: 'w-full' })));
   grid.append(field(`${cls.mainStat} (naked, no gear/charms)`, numInput(() => build.baseMainStat, v => build.baseMainStat = v, { w: 'w-full' })));
-  grid.append(field(`Bonus ${cls.mainStat} (charms / seal / talisman)`, numInput(() => build.extraMainStat, v => build.extraMainStat = v, { w: 'w-full' })));
 
   const checkWrap = el('label', { class: 'flex items-center gap-2 col-span-2 text-sm cursor-pointer mt-1' });
   const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
@@ -211,11 +210,11 @@ function nakedBaselineCard() {
     el('li', {}, 'Hover each line. The tooltip has a ', el('strong', { class: 'text-zinc-200' }, 'top'), ' (visible) number and a ', el('strong', { class: 'text-zinc-200' }, 'bottom'), ' line: ',
       el('em', { class: 'text-amber-300' }, '“You have +X% of this stat from items and Paragon.”'),
       ' Copy the bottom number.'),
-    el('li', {}, 'The inherent +50% crit damage and +20% vulnerable are already baked into the formula — don’t add them.'),
+    el('li', {}, 'The inherent +50% crit damage and +20% vulnerable are already baked into the formula, do not add them.'),
   );
   body.append(steps);
   const fig = el('figure', { class: 'border border-zinc-800 rounded overflow-hidden bg-zinc-950 max-w-[320px]' });
-  const img = el('img', { src: import.meta.env.BASE_URL + 'help/offensive-tab-hover.webp', alt: 'D4 Offensive tab tooltip example', class: 'block w-full h-auto', loading: 'lazy' }) as HTMLImageElement;
+  const img = el('img', { src: import.meta.env.BASE_URL + 'help/offensive-tab-hover.png', alt: 'D4 Offensive tab tooltip example', class: 'block w-full h-auto', loading: 'lazy' }) as HTMLImageElement;
   fig.append(img);
   fig.append(el('figcaption', { class: 'text-[10px] text-zinc-500 px-2 py-1' }, 'Hover a stat → read the bottom “+X% from items and Paragon” line.'));
   body.append(fig);
@@ -241,7 +240,7 @@ function nakedBaselineCard() {
 
   // Custom additive entries: for additive stat lines that exist in the in-game offensive tab but aren't in our default list (e.g., Rogue's Damage with Imbued, Damage vs Distant)
   card.append(el('h4', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-4 mb-2' }, 'Other additive lines'));
-  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'For additive damage lines on your in-game offensive tab that aren’t in the default list above (e.g., Rogue’s “Damage with Imbued”, “Damage vs Distant”, etc.). Same rule: copy the BOTTOM tooltip number from the offensive tab.'));
+  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'For additive damage lines on your in-game offensive tab that aren’t in the default list above (e.g., “Damage with Ultimate”, “Damage vs Close”, “Damage vs Distant”, “Damage vs Healthy”, “Damage vs Crowd Controlled”, Rogue’s “Damage with Imbued”, etc.). Same rule: copy the BOTTOM tooltip number from the offensive tab. Anything you add here is treated as always-on and gets included in the result, even if it’s technically conditional in-game.'));
   const paragonSlot = build.slots.find(s => s.id === 'paragon');
   if (paragonSlot) {
     const customAdds = paragonSlot.affixes.filter(a => a.bucket === 'ADDITIVE');
@@ -295,7 +294,7 @@ function charmsCard() {
 
 function glyphsCard() {
   const card = sectionCard('Glyph Sockets (5 max)',
-    'Each glyph has up to 3 sources of damage: the additive bonus (top), additional bonus (often conditional, ignore if not steady-state), and the legendary bonus (bottom). Enter ONLY the legendary bonus here — the additive parts are already in your naked baseline numbers above.');
+    'Each glyph has up to 3 sources of damage: the additive bonus (top), additional bonus (often conditional, ignore if not steady-state), and the legendary bonus (bottom). Enter ONLY the legendary bonus here. The additive parts are already in your naked baseline numbers above.');
   const order = ['glyph1','glyph2','glyph3','glyph4','glyph5'];
   for (const id of order) {
     const slot = build.slots.find(s => s.id === id);
@@ -546,7 +545,7 @@ function bucketsCard() {
     el('summary', { class: 'cursor-pointer text-zinc-400 select-none' }, 'How buckets work'),
     el('div', { class: 'mt-2 text-zinc-400 space-y-2' },
       el('p', {}, 'Same-named affixes ', el('strong', {}, 'sum into one bucket'), '; the bucket then multiplies into the damage formula. A small bucket gains more from a new affix than a big one.'),
-      el('p', {}, 'Example: CSDM bucket at +150% (×2.50). Adding x10% → +160% (×2.60). Damage gain = 2.60 / 2.50 = +4%. If your Vulnerable bucket only had +20% (×1.20), same +10% affix goes to ×1.30 → +8.3% — twice as good.'),
+      el('p', {}, 'Example: CSDM bucket at +150% (×2.50). Adding x10% → +160% (×2.60). Damage gain = 2.60 / 2.50 = +4%. If your Vulnerable bucket only had +20% (×1.20), same +10% affix goes to ×1.30 → +8.3%, twice as good.'),
       el('p', {}, el('strong', {}, '+ vs x: '), '“+75% Crit Damage” joins the giant additive bucket. “x56% Crit Damage Multiplier” is its own much smaller bucket. The x version is usually 3-5× more valuable in late game.'),
     ),
   ));
@@ -587,7 +586,7 @@ function formulaCard() {
   card.append(el('h2', { class: 'text-base font-bold text-amber-400 mb-3' }, 'How the formula works'));
   card.append(el('p', { class: 'mb-4' },
     'D4 damage is a single product of factors. Each factor (a "bucket") is either a sum of additive % values or a single multiplier. The marginal value of an affix is approximately ',
-    katexInline('\\Delta / B'), ', where ', katexInline('B'), ' is the bucket\'s current value — smaller buckets give bigger gains.',
+    katexInline('\\Delta / B'), ', where ', katexInline('B'), ' is the bucket\'s current value. Smaller buckets give bigger gains.',
   ));
 
   // Main formula — use plain symbols, not in-build jargon
@@ -830,7 +829,7 @@ function loadSampleBtn() {
       && build.slots.every(s => s.affixes.length === 0 && (s.weaponTypeId ?? 'none') === 'none');
     if (!isEmpty && !confirm('Replace the current build with the sample? Your current build will be lost (Snapshot/Reset can recover it).')) return;
     const parsed = importJsonObject(samplePaladin);
-    if (!parsed) { alert('Sample build failed to load. (Bug — please report.)'); return; }
+    if (!parsed) { alert('Sample build failed to load. (Bug, please report.)'); return; }
     build = parsed;
     persist(build);
     mount();
@@ -859,13 +858,13 @@ function openJsonDialog() {
   const copyBtn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300' }, 'Copy');
   copyBtn.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(ta.value); status.textContent = 'Copied to clipboard'; status.className = 'text-xs text-emerald-400'; }
-    catch { status.textContent = 'Copy failed — select & copy manually'; status.className = 'text-xs text-red-400'; }
+    catch { status.textContent = 'Copy failed, select & copy manually'; status.className = 'text-xs text-red-400'; }
   });
 
   const applyBtn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-zinc-950 font-medium' }, 'Apply');
   applyBtn.addEventListener('click', () => {
     const parsed = importJson(ta.value);
-    if (!parsed) { status.textContent = 'Invalid JSON — not applied'; status.className = 'text-xs text-red-400'; return; }
+    if (!parsed) { status.textContent = 'Invalid JSON, not applied'; status.className = 'text-xs text-red-400'; return; }
     build = parsed;
     persist(build);
     mount();

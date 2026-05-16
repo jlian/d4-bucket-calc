@@ -8,20 +8,20 @@ It's a faithful port of [Avarilyn](https://www.youtube.com/@avarilyn)'s damage o
 
 ## What it does
 
-Damage in D4 is a product of "buckets" — additive damage, main stat, multiple `[x]` multiplier categories, weapon damage, skill ranks, etc. Each bucket has *diminishing returns*: the more it has, the less each new affix is worth.
+Damage in D4 is a product of "buckets": additive damage, main stat, multiple `[x]` multiplier categories, weapon damage, skill ranks, etc. Each bucket has *diminishing returns*: the more it has, the less each new affix is worth.
 
 This tool tells you **which bucket is small** and therefore which affix would give you the biggest gain per slot.
 
 ## How to use
 
 1. Pick your **class** (sets main stat divisor).
-2. Strip your gear in-game and record your **naked baseline** main stat + additive total. *(Hover each in-game additive stat and use the BOTTOM number — the top one lies.)*
+2. Strip your gear in-game and record your **naked baseline** main stat + additive total. *(Hover each in-game additive stat and use the BOTTOM number, the top one lies.)*
 3. Enter your **weapon damage**, **skill coefficient** (level 1), and **base crit chance**.
 4. Add each gear piece's affixes via the slot grid. Use the bucket dropdown so each affix lands in the right pool.
 5. Optionally add **standalone `[x]` aspects/uniques** in the bottom card (Grandfather, Godslayer, etc.).
 6. Look at the **Buckets** panel on the right. The top row (sorted by Weight) is your **highest-leverage upgrade target**.
 
-The calculator persists state to your browser. The **Copy Share Link** button gives you a URL with all your inputs embedded — share with friends or save as a snapshot.
+The calculator persists state to your browser. The **Copy Share Link** button gives you a URL with all your inputs embedded, share with friends or save as a snapshot.
 
 ## Credits
 

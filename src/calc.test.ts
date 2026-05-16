@@ -68,15 +68,18 @@ function makeReferencePaladin(): Build {
       { id: 'wep2', name: 'Weapon 2', weaponTypeId: 'none', affixes: [] },
     ],
   };
-  // Set additive lines to match the sheet
+  // Set additive lines to match the sheet (close/elites/healthy lines were removed from defaults;
+  // their additive values are now bundled into a single ADDITIVE affix below to preserve the reference total).
   const lines: Record<string, number> = {
-    vulnerable: 0.31, all: 2.43, primaryElem: 3.8,
-    close: 0.18, elites: 2.04, healthy: 0.625,
+    vulnerable: 0.31, all: 2.43, primaryElem: 3.8, elites: 2.04,
   };
   for (const id in lines) {
     const l = b.additiveLines.find(x => x.id === id);
     if (l) l.value = lines[id];
   }
+  // Stuff removed conditional lines (close, healthy) as an ADDITIVE affix on the helm so the bucket total matches the sheet.
+  const helm = b.slots.find(s => s.id === 'helm');
+  if (helm) helm.affixes.push({ bucket: 'ADDITIVE', value: 0.18 + 0.625 });
   return b;
 }
 
