@@ -150,12 +150,12 @@ function renderHeader() {
   );
 }
 
-// ---------- Card 1: Naked Baseline (class + skill + offensive tab numbers) ----------
+// ---------- Card 1: Baseline Stats (class + skill + stats sheet numbers) ----------
 function nakedBaselineCard() {
   const cls = classFor(build);
-  const card = sectionCard('Naked Baseline (class, skill, offensive tab)');
+  const card = sectionCard('Baseline Stats');
 
-  // Class + skill inputs live at the top, since the user has to be naked to read both these and the offensive-tab numbers below.
+  // Class + skill inputs live at the top, since the user has to be naked to read both these and the stats-sheet numbers below.
   const topGrid = el('div', { class: 'grid grid-cols-2 gap-3 mb-3' });
 
   const classSel = el('select', { class: inputCls() + ' w-full' }) as HTMLSelectElement;
@@ -185,13 +185,13 @@ function nakedBaselineCard() {
 
   // Replace the long single-paragraph subtitle with bullet steps + a reference screenshot
   const help = el('details', { class: 'mb-3 text-xs text-zinc-400', open: '' });
-  const summary = el('summary', { class: 'cursor-pointer text-zinc-300 select-none' }, 'How to fill this in (takes 2 min in-game)');
+  const summary = el('summary', { class: 'cursor-pointer text-zinc-300 select-none' }, 'Getting the right numbers from the stats sheet');
   help.append(summary);
   const body = el('div', { class: 'mt-2 grid sm:grid-cols-[1fr_auto] gap-3 items-start' });
   const steps = el('ol', { class: 'list-decimal list-inside space-y-1 text-zinc-400' });
   steps.append(
     el('li', {}, 'Strip ', el('strong', { class: 'text-zinc-200' }, 'all'), ' gear (and charms / Horadric Seal). You want pure paragon contribution.'),
-    el('li', {}, 'Open Character Sheet → ', el('strong', { class: 'text-zinc-200' }, 'Offensive'), ' tab.'),
+    el('li', {}, 'Open the ', el('strong', { class: 'text-zinc-200' }, 'Stats Sheet'), ' (press the ', el('em', { class: 'text-amber-300' }, 'Stats & Materials'), ' button) and switch to the ', el('strong', { class: 'text-zinc-200' }, 'Offensive'), ' tab.'),
     el('li', {}, 'Hover each line. The tooltip has a ', el('strong', { class: 'text-zinc-200' }, 'top'), ' (visible) number and a ', el('strong', { class: 'text-zinc-200' }, 'bottom'), ' line: ',
       el('em', { class: 'text-amber-300' }, '“You have +X% of this stat from items and Paragon.”'),
       ' Copy the bottom number.'),
@@ -199,7 +199,7 @@ function nakedBaselineCard() {
   );
   body.append(steps);
   const fig = el('figure', { class: 'border border-zinc-800 rounded overflow-hidden bg-zinc-950 max-w-[320px]' });
-  const img = el('img', { src: import.meta.env.BASE_URL + 'help/offensive-tab-hover.png', alt: 'D4 Offensive tab tooltip example', class: 'block w-full h-auto', loading: 'lazy' }) as HTMLImageElement;
+  const img = el('img', { src: import.meta.env.BASE_URL + 'help/offensive-tab-hover.png', alt: 'D4 stats sheet tooltip example', class: 'block w-full h-auto', loading: 'lazy' }) as HTMLImageElement;
   fig.append(img);
   fig.append(el('figcaption', { class: 'text-[10px] text-zinc-500 px-2 py-1' }, 'Hover a stat → read the bottom “+X% from items and Paragon” line.'));
   body.append(fig);
@@ -223,9 +223,9 @@ function nakedBaselineCard() {
   }
   card.append(grid);
 
-  // Custom additive entries: for additive stat lines that exist in the in-game offensive tab but aren't in our default list (e.g., Rogue's Damage with Imbued, Damage vs Distant)
+  // Custom additive entries: for additive stat lines that exist on the stats sheet but aren't in our default list (e.g., Rogue's Damage with Imbued, Damage vs Distant)
   card.append(el('h4', { class: 'text-xs uppercase tracking-wide text-zinc-500 mt-4 mb-2' }, 'Other additive lines'));
-  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'For additive damage lines on your in-game offensive tab that aren’t in the default list above (like “Damage vs Distant”, “Damage vs Healthy”, “Damage vs Crowd Controlled”, etc.). Same rule: copy the BOTTOM tooltip number from the offensive tab. Anything you add here is treated as always-on and gets included in the result, even if it’s technically conditional in-game.'));
+  card.append(el('p', { class: 'text-xs text-zinc-500 mb-2' }, 'For additive damage lines on your in-game stats sheet that aren’t in the default list above (like “Damage vs Distant”, “Damage vs Healthy”, “Damage vs Crowd Controlled”, etc.). Same rule: copy the BOTTOM tooltip number from the stats sheet. Anything you add here is treated as always-on and gets included in the result, even if it’s technically conditional in-game.'));
   const paragonSlot = build.slots.find(s => s.id === 'paragon');
   if (paragonSlot) {
     const customAdds = paragonSlot.affixes.filter(a => a.bucket === 'ADDITIVE');
@@ -290,7 +290,7 @@ function glyphsCard() {
 
 function paragonContributionsCard() {
   const card = sectionCard('Paragon Nodes (legendary, rare, magic)',
-    'For each paragon node that contributes a x% [bucket] mult or +X% damage. Add as many as you have. (Pure additive bonuses already counted via Offensive tab tooltip values above.)');
+    'For each paragon node that contributes a x% [bucket] mult or +X% damage. Add as many as you have. (Pure additive bonuses already counted via the stats sheet tooltip values above.)');
   const slot = build.slots.find(s => s.id === 'paragon');
   if (slot) card.append(slotBlock(slot));
   return card;
