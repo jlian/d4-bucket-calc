@@ -555,17 +555,25 @@ function statsCard() {
   const c = calc(build);
   const cls = classFor(build);
   const card = sectionCard('Stats Summary');
-  const pctOf = (mult: number) => `+${((mult - 1) * 100).toFixed(1)}% (×${mult.toFixed(3)})`;
+  // Render every multiplier-style value as a flat percentage of base damage, no +/× prefixes.
+  // e.g. an internal multiplier of 3.588 renders as "358.8%".
+  const pct = (mult: number, digits = 1) => `${(mult * 100).toFixed(digits)}%`;
+  // Additive bucket is scenario-dependent; use the same scenario the Damage readout is using
+  // so the value here matches what's being applied. Render as the bucket multiplier (1 + A),
+  // so e.g. +950% additive shows up as "1050%".
+  const addBucket = additiveForScenario(build, { ...scenarioState });
+  const addCrit = critOnlyAdditive(build);
   const stats: [string, string][] = [
     ['Weapon Damage', c.weaponDmg ? fmtNum(c.weaponDmg) : 'pick weapon'],
-    [`${cls.mainStat} (total)`, `${fmtNum(c.mainStatSum)} → ×${c.mainStatMult.toFixed(3)} multiplier`],
-    ['Skill Damage %', `+${(c.skillCoef * 100).toFixed(1)}% (${c.totalSkillRanks} ranks)`],
-    ['Critical Strike Chance', fmtPct(c.critChance, 1)],
-    ['Critical Strike Damage Mult', pctOf(c.csdm)],
-    ['Vulnerable Damage Mult', pctOf(c.vdm)],
-    ['Damage Over Time Mult', pctOf(c.dotm)],
-    ['All / Element Damage Mult', pctOf(c.allm)],
-    ['Standalone x% product', `×${c.extraMultProduct.toFixed(3)}`],
+    [`${cls.mainStat} (total)`, `${fmtNum(c.mainStatSum)} → ${pct(c.mainStatMult, 1)} multiplier`],
+    ['Skill Damage', `${pct(c.skillCoef)} (${c.totalSkillRanks} ranks)`],
+    ['Critical Strike Chance', pct(c.critChance, 1)],
+    ['Additive bucket (hit)', `${pct(1 + addBucket)} of base`],
+    ['Additive bucket (crit)', `${pct(1 + addBucket + addCrit)} of base`],
+    ['Critical Strike Damage Mult', pct(c.csdm)],
+    ['Vulnerable Damage Mult', pct(c.vdm)],
+    ['All / Element Damage Mult', pct(c.allm)],
+    ['Standalone % product', pct(c.extraMultProduct)],
   ];
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
