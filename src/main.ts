@@ -184,7 +184,7 @@ function nakedBaselineCard() {
   card.append(topGrid);
 
   // Replace the long single-paragraph subtitle with bullet steps + a reference screenshot
-  const help = el('details', { class: 'mb-3 text-xs text-zinc-400', open: '' });
+  const help = el('details', { class: 'mb-3 text-xs text-zinc-400' });
   const summary = el('summary', { class: 'cursor-pointer text-zinc-300 select-none' }, 'Getting the right numbers from the stats sheet');
   help.append(summary);
   const body = el('div', { class: 'mt-2 grid sm:grid-cols-[1fr_auto] gap-3 items-start' });
@@ -634,7 +634,9 @@ function bucketsCard() {
   card.append(table);
 
   // "How buckets work" at the bottom, expanded by default.
-  card.append(el('details', { class: 'mt-4 text-xs text-zinc-500 border border-zinc-800/60 rounded p-2', open: '' },
+  // "Why some affixes are worth more than others" at the bottom. Collapsed by default now
+  // that the table itself is the primary content.
+  card.append(el('details', { class: 'mt-4 text-xs text-zinc-500' },
     el('summary', { class: 'cursor-pointer text-zinc-400 select-none' }, 'Why some affixes are worth more than others'),
     el('div', { class: 'mt-2 text-zinc-400 space-y-2' },
       el('p', {}, 'Same-named affixes ', el('strong', {}, 'sum into one bucket'), '; the bucket then multiplies into the damage formula. A small bucket gains more from a new affix than a big one.'),
@@ -726,7 +728,10 @@ function formulaCard() {
   card.append(el('h2', { class: 'text-base font-bold text-amber-400 mb-3' }, 'How the formula works'));
   card.append(el('p', { class: 'mb-4' },
     'D4 damage is a single product of factors. Each factor (a "bucket") is either a sum of additive % values or a single multiplier. The marginal value of an affix is approximately ',
-    katexInline('\\Delta / B'), ', where ', katexInline('B'), ' is the bucket\'s current value. Smaller buckets give bigger gains.',
+    katexInline('\\Delta / B'), ', where ', katexInline('B'), ' is the bucket\'s current value. Smaller buckets give bigger gains: at sizes ',
+    katexInline('A'), ' and ', katexInline('B'),
+    ', the same affix is worth ', katexInline('B / A'), ' times more in the smaller bucket, so a balanced spread of multipliers maximizes the product (',
+    Object.assign(el('a', { href: 'https://en.wikipedia.org/wiki/Inequality_of_arithmetic_and_geometric_means', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'AM-GM inequality' }), ').',
   ));
 
   // Main formula. Use plain symbols, not in-build jargon.
@@ -734,14 +739,7 @@ function formulaCard() {
   const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (1.5 \cdot M_{crit})^{c} \cdot (1.2 \cdot M_{vuln})^{v} \cdot M_{dot}^{d} \cdot M_{all} \cdot (1 - R)`;
   card.append(el('div', { class: 'my-4 flex justify-center overflow-x-auto' }, katexBlock(formula)));
 
-  // Min/max heuristic
-  card.append(el('p', { class: 'text-zinc-400 mb-3 text-sm' },
-    'For two buckets at sizes ', katexInline('A'), ' and ', katexInline('B'),
-    ', the same affix is ', katexInline('B / A'), ' times more valuable in the smaller one. Spread your multipliers: a product is maximized when its factors are balanced (',
-    Object.assign(el('a', { href: 'https://en.wikipedia.org/wiki/Inequality_of_arithmetic_and_geometric_means', target: '_blank', class: 'text-amber-400 hover:underline' }), { textContent: 'AM-GM inequality' }), ').',
-  ));
-
-  // Worked example with current build values (decimals only)
+  // Worked example with current build values (decimals only).
   card.append(buildPluggedIn());
 
   card.append(el('p', { class: 'text-xs text-zinc-500 mt-4' },
@@ -809,8 +807,7 @@ function extraMultMath(b: Build): string {
 }
 
 function buildPluggedIn(): HTMLElement {
-  const wrap = el('div', { class: 'my-4 bg-zinc-950 border border-zinc-800 rounded p-4' });
-  wrap.append(el('h3', { class: 'text-sm font-semibold text-amber-400 mb-3' }, '✨ Your build, plugged in'));
+  const wrap = el('div', { class: 'my-4' });
   const c = calc(build);
   if (c.weaponDmg === 0) {
     wrap.append(el('p', { class: 'text-xs text-zinc-500' }, 'Pick a weapon type to see the formula with your numbers.'));
