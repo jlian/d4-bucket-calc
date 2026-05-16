@@ -1,10 +1,10 @@
-# D4 Bucket Calc
+# D4 Damage Calc
 
 A static web app that helps you find the highest-leverage stat slots on your **Diablo 4 Season 13 (Lord of Hatred)** build.
 
 It's a faithful port of [Avarilyn](https://www.youtube.com/@avarilyn)'s damage optimization spreadsheet, made interactive, mobile-friendly, and shareable via URL.
 
-🔗 **Live:** https://jlian.github.io/d4-bucket-calc/
+🔗 **Live:** https://jlian.github.io/d4-damage-calc/
 
 ## What it does
 
