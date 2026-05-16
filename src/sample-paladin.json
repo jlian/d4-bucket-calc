@@ -90,7 +90,7 @@
         { "bucket": "CSDM",       "value": 0.21 },
         { "bucket": "ALLM",       "value": 0.13 },
         { "bucket": "CRITCHANCE", "value": 0.1 },
-        { "bucket": "GEM",        "value": 0.24, "label": "Weapon gem" },
+        { "bucket": "GEM",        "value": 0.24, "label": "Weapon gem 1" },
         { "bucket": "EXTRAMULT",  "value": 0.98, "label": "Herald's Morningstar x98% Blessed Hammer" }
       ]
     },
