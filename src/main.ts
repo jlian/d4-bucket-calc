@@ -746,7 +746,7 @@ function statsCard() {
 
 // ---------- Footer: formula card (KaTeX rendered) ----------
 function formulaCard() {
-  const card = el('section', { class: 'bg-zinc-900/30 border border-zinc-800 rounded-lg p-6 text-sm text-zinc-300' });
+  const card = el('section', { class: 'bg-zinc-900/30 border border-zinc-800 rounded-lg p-4 sm:p-6 text-sm text-zinc-300' });
   card.append(el('h2', { class: 'text-sm font-semibold text-zinc-300 uppercase tracking-wide mb-3' }, 'How the formula works'));
   card.append(el('p', { class: 'mb-4' },
     'D4 damage is a single product of factors. Each factor (a "bucket") is either a sum of additive % values or a single multiplier. The marginal value of an affix is approximately ',
@@ -759,7 +759,9 @@ function formulaCard() {
   // Main formula. Use plain symbols, not in-build jargon.
   const divisor = classFor(build).divisor;
   const formula = String.raw`D = W \cdot (1 + A) \cdot \left(1 + \frac{S}{${divisor}}\right) \cdot C \cdot \prod_{i} M_i \cdot (1.5 \cdot M_{crit})^{c} \cdot (1.2 \cdot M_{vuln})^{v} \cdot M_{dot}^{d} \cdot M_{all} \cdot (1 - R)`;
-  card.append(el('div', { class: 'my-4 flex justify-center overflow-x-auto' }, katexBlock(formula)));
+  card.append(el('div', { class: 'my-4 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0' },
+    el('div', { class: 'flex justify-center min-w-max' }, katexBlock(formula))
+  ));
 
   // Worked example with current build values (decimals only).
   card.append(buildPluggedIn());
@@ -851,8 +853,8 @@ function buildPluggedIn(): HTMLElement {
   const hi = (s: string) => `<span class="text-amber-400 font-mono">${s}</span>`;
 
   // One table: Symbol matches the formula exactly | Description (text) | math (intermediate) | result (decimal)
-  const tbl = el('table', { class: 'w-full text-xs my-3' });
-  tbl.append(el('thead', {}, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
+  const tbl = el('table', { class: 'w-full text-xs my-3 block sm:table' });
+  tbl.append(el('thead', { class: 'hidden sm:table-header-group' }, el('tr', { class: 'text-xs text-zinc-500 border-b border-zinc-800' },
     el('th', { class: 'text-left py-1 font-normal w-32' }, 'Factor'),
     el('th', { class: 'text-left py-1 font-normal' }, 'Description'),
     el('th', { class: 'text-right py-1 font-normal whitespace-nowrap' }, 'Math'),
@@ -908,16 +910,16 @@ function buildPluggedIn(): HTMLElement {
     ['Enemy damage reduction. ', katexInline('R = 0.80'), ' for a level-appropriate enemy / training dummy (80% reduction).'],
     `1 - 0.80`, build.enemyDamageFactor]);
 
-  const tb = el('tbody');
+  const tb = el('tbody', { class: 'block sm:table-row-group' });
   for (const [sym, desc, math, val] of rows) {
-    const descCell = el('td', { class: 'py-1 text-zinc-400 align-top' });
+    const descCell = el('td', { class: 'block sm:table-cell py-1 text-zinc-400 align-top order-3' });
     if (Array.isArray(desc)) descCell.append(...desc);
     else descCell.append(desc);
-    tb.append(el('tr', { class: 'border-b border-zinc-900 align-top' },
-      el('td', { class: 'py-1 pr-3 align-top' }, katexInline(sym)),
+    tb.append(el('tr', { class: 'flex flex-wrap sm:table-row border-b border-zinc-800 sm:border-zinc-900 align-top py-3 sm:py-0 gap-x-3' },
+      el('td', { class: 'block sm:table-cell py-1 sm:pr-3 align-top order-1 text-sm sm:text-xs' }, katexInline(sym)),
       descCell,
-      el('td', { class: 'py-1 text-right text-zinc-500 font-mono tabular-nums pl-2 align-top' }, math),
-      el('td', { class: 'py-1 text-right font-mono text-amber-400 tabular-nums whitespace-nowrap pl-3 align-top' }, dec(val, 2)),
+      el('td', { class: 'block sm:table-cell w-full sm:w-auto py-1 text-left sm:text-right text-zinc-500 font-mono tabular-nums sm:pl-2 align-top order-4 break-all sm:break-normal text-[11px] sm:text-xs' }, math),
+      el('td', { class: 'block sm:table-cell py-1 ml-auto sm:ml-0 text-right font-mono text-amber-400 tabular-nums whitespace-nowrap sm:pl-3 align-top order-2 text-base sm:text-xs font-semibold sm:font-normal' }, dec(val, 2)),
     ));
   }
   tbl.append(tb);
