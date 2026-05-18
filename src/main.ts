@@ -26,6 +26,17 @@ const fmtBigNum = (n: number) => {
 };
 const stripTrailingZero = (s: string) => s.includes('.') ? s.replace(/\.?0+$/, '') : s;
 
+// Compare two builds for the "is the saved version still in sync?" indicator.
+// We strip the nested `snapshot` field on both sides and JSON-compare; AdditiveLine.applies
+// is a function and won't survive JSON, but cloneBuild preserves it, and JSON.stringify just drops it from both,
+// so the comparison still works for the meaningful state.
+function buildsEqualForCompare(a: Build, b: Build): boolean {
+  try {
+    const norm = (x: Build) => JSON.stringify({ ...x, snapshot: null }, (_k, v) => typeof v === 'function' ? undefined : v);
+    return norm(a) === norm(b);
+  } catch { return false; }
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, any> = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   for (const k in attrs) {
@@ -647,10 +658,20 @@ function scenariosCard() {
       const delta = refNow / refSnap - 1;
       const sign = delta >= 0 ? '+' : '';
       const cls = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-zinc-500';
-      card.append(el('div', { class: 'mt-2 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs' },
+      const deltaRow = el('div', { class: 'mt-2 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs gap-2' });
+      const leftSide = el('div', { class: 'flex items-center gap-2 min-w-0' },
         el('span', { class: 'text-zinc-500' }, '📌 vs saved build:'),
-        el('span', { class: cls + ' font-bold tabular-nums' }, sign + fmtPct(delta, 2)),
-      ));
+      );
+      const clearLink = el('button', {
+        type: 'button',
+        class: 'text-[10px] text-zinc-600 hover:text-red-400 transition',
+        title: 'Discard the saved build (current build is unchanged)',
+      }, '✕ clear');
+      clearLink.addEventListener('click', () => { build.snapshot = null; persist(build); mount(); });
+      leftSide.append(clearLink);
+      deltaRow.append(leftSide);
+      deltaRow.append(el('span', { class: cls + ' font-bold tabular-nums' }, sign + fmtPct(delta, 2)));
+      card.append(deltaRow);
     }
   }
   return card;
@@ -1066,13 +1087,28 @@ function copyShareBtn() {
 }
 
 function snapshotBtn() {
-  if (build.snapshot) {
-    const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-100', title: 'Discard the saved build (current build is unchanged)' }, '🗑 Clear Saved');
-    btn.addEventListener('click', () => { build.snapshot = null; persist(build); mount(); });
-    return btn;
-  }
-  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Save the current build so you can compare future edits against it' }, '💾 Save Build');
+  // Single primary action: "Save Build". When something has changed since last save,
+  // show an amber dot prefix ("● Save Build") — same dirty-state convention as VSCode / Figma / browsers.
+  // Clicking always overwrites the saved build, no confirmation needed (Restore Saved is the undo).
+  const saved = build.snapshot;
+  const dirty = !!saved && !buildsEqualForCompare(build, saved);
+  const isFresh = !!saved && !dirty;
+  const label = saved ? (dirty ? 'Save Build' : 'Saved') : 'Save Build';
+  const title = saved
+    ? (dirty ? 'Overwrite the saved build with the current one' : 'Current build matches the saved one')
+    : 'Save the current build so you can compare future edits against it';
+  const baseCls = 'text-xs px-3 py-1.5 rounded inline-flex items-center gap-1.5 transition ';
+  const stateCls = dirty
+    ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40'
+    : isFresh
+      ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 cursor-default'
+      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-transparent';
+  const btn = el('button', { class: baseCls + stateCls, title }, label);
+  if (dirty) btn.prepend(el('span', { class: 'w-1.5 h-1.5 rounded-full bg-amber-400 inline-block' }));
+  else if (isFresh) btn.prepend(el('span', { class: 'text-xs leading-none' }, '✓'));
+  else btn.prepend(el('span', { class: 'text-xs leading-none' }, '💾'));
   btn.addEventListener('click', () => {
+    if (isFresh) return; // no-op: nothing to overwrite
     const snap = cloneBuild(build); snap.snapshot = null;
     build.snapshot = snap;
     persist(build);
