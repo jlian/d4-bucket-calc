@@ -159,6 +159,11 @@
         {
           "bucket": "CSDM",
           "value": 0.5
+        },
+        {
+          "bucket": "EXTRAMULT",
+          "value": 0.13,
+          "label": "Legendary Aspect: Arbiter's Evade x13% Core Skill dmg"
         }
       ]
     },
@@ -167,8 +172,19 @@
       "name": "Ring 2",
       "affixes": [
         {
-          "bucket": "MAINSTAT",
-          "value": 151
+          "bucket": "CRITCHANCE",
+          "value": 0.215,
+          "label": "Ring of Starless Skies +21.5% crit"
+        },
+        {
+          "bucket": "SKILLRANK",
+          "value": 3,
+          "label": "Ring of Starless Skies +3 Core Skills"
+        },
+        {
+          "bucket": "EXTRAMULT",
+          "value": 0.5,
+          "label": "Legendary Aspect: Starless Skies x50% dmg (max stacks)"
         }
       ]
     },
