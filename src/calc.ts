@@ -232,7 +232,7 @@ export function computeWeaponDamage(b: Build): { dmg: number; speed: number; has
     if (w1 && w2 && weaponTypeById(w1.weaponTypeId ?? 'none').hands === 2 && weaponTypeById(w2.weaponTypeId ?? 'none').hands === 2) dmg *= 2;
   }
   const speed = speedCount > 0 ? speedSum / speedCount : 0;
-  // Bonus % weapon damage from any slot (e.g. Herald of Zakarum's +100% main hand weapon damage on the shield).
+  // Bonus % weapon damage from any slot (e.g. shield's +% Weapon Damage Bonus innate, or aspects that add to it).
   // Sums additively across slots and multiplies the final weapon-damage value as (1 + sum).
   const wepDmgPctSum = sumAffixes(b.slots, 'WEPDMG_PCT');
   return { dmg: dmg * (1 + wepDmgPctSum), speed, hasAny };
@@ -361,9 +361,9 @@ export const BUCKET_META: Record<Bucket, { label: string; isPercent: boolean; ty
   ADDITIVE:     { label: 'Custom [+]%',           isPercent: true,  typicalRoll: 0.10 },
   CRITADD:      { label: '+% Critical Strike Damage',             isPercent: true,  typicalRoll: 0.10 },
   MAINSTAT:     { label: '+ Main Stat (Str/Dex/Int/Will)',        isPercent: false, typicalRoll: 200 },
-  MAINSTAT_PCT: { label: 'x% Main Stat Multiplier',               isPercent: true,  typicalRoll: 0.10 },
+  MAINSTAT_PCT: { label: '+% Main Stat (Str/Dex/Int/Will)',       isPercent: true,  typicalRoll: 0.10 },
   WEPDMG:       { label: '+ Weapon Damage',                       isPercent: false, typicalRoll: 196 },
-  WEPDMG_PCT:   { label: 'x% Weapon Damage (e.g. shield bonus)',  isPercent: true,  typicalRoll: 1.0 },
+  WEPDMG_PCT:   { label: '+% Weapon Damage Bonus',                isPercent: true,  typicalRoll: 1.0 },
   GEM:          { label: 'Weapon Gem (sums into All / Element)',  isPercent: true,  typicalRoll: 0.10 },
   CRITCHANCE:   { label: '+% Critical Strike Chance',             isPercent: true,  typicalRoll: 0.10 },
   SKILLRANK:    { label: '+ Skill Ranks',                         isPercent: false, typicalRoll: 5 },

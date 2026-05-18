@@ -332,14 +332,44 @@ const CLASS_HINTS: Record<string, string> = {
 function paragonContributionsCard() {
   const card = sectionCard('Other Buffs & Multipliers',
     'Anything that contributes damage outside of gear, charms, glyphs, and the stats sheet. Skills, paragon nodes, key passives, class mechanics, auras, sacrifices, and similar. Add one row per source. Skip anything whose % already shows up on the stats sheet, it\u2019s already counted above.');
+
+  // Big warning callout. End-game builds frequently combine 100-1000x worth of multipliers here
+  // (paragon Castle node alone is x2.00), and missing them silently understates damage by orders of magnitude.
+  // This is the #1 reason real in-game damage doesn't match the tool's output.
+  card.append(el('div', { class: 'mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200' },
+    el('div', { class: 'font-semibold mb-1' }, '\u26a0\ufe0f This is where most builds lose damage'),
+    el('div', { class: 'text-amber-200/90 leading-relaxed' },
+      'Standalone [x]% multipliers (paragon nodes like ',
+      el('span', { class: 'font-semibold' }, 'Castle (+100% global damage)'),
+      ', aspects, uniques, key passives, set bonuses, auras) are NOT shown on your in-game stats sheet. You have to enter each one as a ',
+      el('span', { class: 'font-mono text-amber-100' }, 'Custom [x]%'),
+      ' affix below. A typical end-game build stacks these into a ',
+      el('span', { class: 'font-semibold' }, 'x100\u2013x1000+'),
+      ' combined factor. If your calculated damage is way lower than what you actually hit for in-game, you\u2019re probably missing several of these.',
+    ),
+  ));
+
   const hint = CLASS_HINTS[build.classId];
   if (hint) {
-    card.append(el('p', { class: 'text-xs text-zinc-500 -mt-2 mb-3' },
+    card.append(el('p', { class: 'text-xs text-zinc-500 mb-3' },
       el('span', { class: 'text-zinc-400' }, `Common sources for ${build.classId}:`),
       ' ', hint));
   }
   const slot = build.slots.find(s => s.id === 'paragon');
   if (slot) card.append(slotBlock(slot));
+
+  // Running total of Custom [x]% multipliers entered. Empty = silent; any value gets an emerald chip
+  // showing the combined x-factor so the user sees the cumulative effect at a glance.
+  if (slot) {
+    const factors = slot.affixes.filter(a => a.bucket === 'EXTRAMULT' && a.value !== 0);
+    if (factors.length > 0) {
+      const combined = factors.reduce((p, a) => p * (1 + a.value), 1);
+      card.append(el('div', { class: 'mt-2 flex items-center justify-between text-xs px-3 py-2 rounded bg-emerald-500/10 border border-emerald-500/30' },
+        el('span', { class: 'text-emerald-300/80' }, `Combined Custom [x]% factor (${factors.length} source${factors.length === 1 ? '' : 's'})`),
+        el('span', { class: 'text-emerald-300 font-mono font-bold tabular-nums' }, `\u00d7${combined.toFixed(2)}`),
+      ));
+    }
+  }
   return card;
 }
 
@@ -395,6 +425,20 @@ function slotBlock(slot: Slot) {
   addBtn.addEventListener('click', () => { slot.affixes.push({ bucket: 'CSDM', value: 0 }); mount(); });
   header.append(addBtn);
   wrap.append(header);
+
+  // Shield-specific reminder: every shield in D4 has an innate "+% Weapon Damage Bonus" that's easy to miss
+  // because the calculator can't read it for you. Surface a hint when no WEPDMG_PCT affix is entered
+  // on the shield slot so the user knows to add it.
+  if (isWeapon && slot.weaponTypeId === 'shield') {
+    const hasWepDmgPct = slot.affixes.some(a => a.bucket === 'WEPDMG_PCT');
+    if (!hasWepDmgPct) {
+      wrap.append(el('div', { class: 'mb-2 px-2 py-1.5 text-[11px] rounded border border-amber-500/30 bg-amber-500/5 text-amber-200/90' },
+        '⚠️ Shields have an innate ',
+        el('span', { class: 'font-semibold' }, '+% Weapon Damage Bonus'),
+        ' (read it off the shield tooltip in-game). Add it below as a “+% Weapon Damage Bonus” affix or your damage will be way off.',
+      ));
+    }
+  }
 
   // Armor gems live on helm, chest, pants; weapon gems live on weapon slots.
   // The actual affix list hides any gem entries (matched by known label) so they only appear
@@ -711,9 +755,8 @@ function bucketsCard() {
     rows.push({ affix: 'x10% All / Element Damage Multiplier', gain: weightFor(build, 'ALLM', 0.10, refScenario) });
     rows.push({ affix: '+10% Damage (additive)',            gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) });
     rows.push({ affix: `+100 ${cls.mainStat}`,              gain: weightFor(build, 'MAINSTAT', 100, refScenario) });
-    rows.push({ affix: `x10% ${cls.mainStat} Multiplier`,   gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) });
     rows.push({ affix: '+100 Weapon Damage',                gain: weightFor(build, 'WEPDMG', 100, refScenario) });
-    rows.push({ affix: 'x10% Weapon Damage',                gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) });
+    rows.push({ affix: '+10% Weapon Damage Bonus',          gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) });
     rows.push({ affix: '+3 Skill Ranks',                    gain: weightFor(build, 'SKILLRANK', 3, refScenario) });
   } else {
     rows.push({ affix: 'x10% Critical Strike Damage Multiplier', gain: weightFor(build, 'CSDM', 0.10, refScenario) });
@@ -722,10 +765,9 @@ function bucketsCard() {
     rows.push({ affix: '+10% Critical Strike Damage',            gain: weightFor(build, 'CRITADD', 0.10, refScenario) });
     rows.push({ affix: '+10% Damage (additive)',                 gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) });
     rows.push({ affix: `+100 ${cls.mainStat}`,                   gain: weightFor(build, 'MAINSTAT', 100, refScenario) });
-    rows.push({ affix: `x10% ${cls.mainStat} Multiplier`,        gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) });
     rows.push({ affix: '+5% Critical Strike Chance',             gain: weightFor(build, 'CRITCHANCE', 0.05, refScenario), warn: c.critChance >= 1 ? 'capped' : undefined });
     rows.push({ affix: '+100 Weapon Damage',                     gain: weightFor(build, 'WEPDMG', 100, refScenario) });
-    rows.push({ affix: 'x10% Weapon Damage',                     gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) });
+    rows.push({ affix: '+10% Weapon Damage Bonus',               gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) });
     rows.push({ affix: '+3 Skill Ranks',                         gain: weightFor(build, 'SKILLRANK', 3, refScenario) });
   }
   rows.sort((a, b) => b.gain - a.gain);
@@ -986,7 +1028,7 @@ function buildPluggedIn(): HTMLElement {
   const rows: Row[] = [
     ['W',
       wepDmgPctSum > 0
-        ? ['Average weapon damage from your equipped weapon(s), boosted by any ', katexInline('+\\%'), ' weapon damage affix (e.g. Herald of Zakarum\u2019s ', katexInline('+100\\%'), ' main-hand weapon damage). Combined as ', katexInline('W_{base} \\cdot (1 + \\Sigma)'), '.']
+        ? ['Average weapon damage from your equipped weapon(s), boosted by ', katexInline('+\\%'), ' Weapon Damage Bonus affixes (shield innate, Herald of Zakarum, etc.). Combined as ', katexInline('W_{base} \\cdot (1 + \\Sigma)'), '.']
         : 'Average weapon damage from your equipped weapon(s).',
       wepDmgPctSum > 0 ? `× (1 + ${dec(wepDmgPctSum)})` : '',
       c.weaponDmg],
