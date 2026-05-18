@@ -2,6 +2,12 @@ import pako from 'pako';
 import { DEFAULT_BUILD, DEFAULT_ADDITIVE_LINES, cloneDefaultLines, BUCKET_META, CLASSES, WEAPON_TYPES, type Build, type AdditiveLine } from './calc';
 
 const STORAGE_KEY = 'd4bc.build';
+
+// Current schema version. Bump whenever we change how saved data should be interpreted on load.
+// v2: shield innate +100% Weapon Damage Bonus is now auto-applied by the calc; strip any legacy
+//     manual WEPDMG_PCT entry of +1.0 from shield slots to avoid double-counting.
+const SCHEMA_VERSION = 2;
+
 const LEGACY_WEAPON_IDS: Record<string, string> = { '1h_focus': 'focus' };
 
 // AdditiveLine has a function field that doesn't survive JSON. Serialize as {id,value} pairs.
@@ -20,7 +26,7 @@ function rehydrateLines(serial: { id: string; value: number }[] | undefined): Ad
 }
 
 function buildToSerial(b: Build): any {
-  return { ...b, additiveLines: b.additiveLines.map(lineToSerial), snapshot: b.snapshot ? buildToSerial(b.snapshot) : null };
+  return { schemaVersion: SCHEMA_VERSION, ...b, additiveLines: b.additiveLines.map(lineToSerial), snapshot: b.snapshot ? buildToSerial(b.snapshot) : null };
 }
 
 function migrateSlots(slotsIn: any): import('./calc').Slot[] {
@@ -79,6 +85,7 @@ function migrateSlotsAndExtras(j: any): import('./calc').Slot[] {
 function serialToBuild(j: any): Build {
   if (!j || typeof j !== 'object') throw new Error('not an object');
   const knownClass = typeof j.classId === 'string' && CLASSES.some(c => c.id === j.classId);
+  const incomingVersion = typeof j.schemaVersion === 'number' ? j.schemaVersion : 1;
   const out: Build = {
     ...DEFAULT_BUILD,
     classId: knownClass ? j.classId : DEFAULT_BUILD.classId,
@@ -98,6 +105,17 @@ function serialToBuild(j: any): Build {
     snapshot: j.snapshot ? safeSerialToBuild(j.snapshot) : null,
   };
   reconcileWeaponClass(out.slots, out.classId);
+  // v1 -> v2: shield innate +100% Weapon Damage Bonus is now baked into the calc.
+  // Strip a single legacy WEPDMG_PCT of +1.0 from any shield slot to avoid double-counting.
+  // (Conservative heuristic: only the first +1.0 entry per shield slot is removed; any extra
+  // user-added WEPDMG_PCT affixes stay.)
+  if (incomingVersion < 2) {
+    for (const slot of out.slots) {
+      if (slot.weaponTypeId !== 'shield') continue;
+      const idx = slot.affixes.findIndex(a => a.bucket === 'WEPDMG_PCT' && Math.abs(a.value - 1.0) < 1e-9);
+      if (idx >= 0) slot.affixes.splice(idx, 1);
+    }
+  }
   return out;
 }
 

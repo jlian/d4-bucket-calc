@@ -232,9 +232,13 @@ export function computeWeaponDamage(b: Build): { dmg: number; speed: number; has
     if (w1 && w2 && weaponTypeById(w1.weaponTypeId ?? 'none').hands === 2 && weaponTypeById(w2.weaponTypeId ?? 'none').hands === 2) dmg *= 2;
   }
   const speed = speedCount > 0 ? speedSum / speedCount : 0;
-  // Bonus % weapon damage from any slot (e.g. shield's +% Weapon Damage Bonus innate, or aspects that add to it).
-  // Sums additively across slots and multiplies the final weapon-damage value as (1 + sum).
-  const wepDmgPctSum = sumAffixes(b.slots, 'WEPDMG_PCT');
+  // Bonus % weapon damage from any slot (e.g. aspects, uniques). Sums additively across slots
+  // and multiplies the final weapon-damage value as (1 + sum).
+  let wepDmgPctSum = sumAffixes(b.slots, 'WEPDMG_PCT');
+  // Shield innate: every D4 shield grants a +100% Weapon Damage Bonus (additive), the design intent being
+  // that 1H+shield comparable to 2H weapon damage. Applied automatically when a shield is equipped
+  // (state migration in state.ts strips legacy manual +1.00 entries to avoid double-counting).
+  if (b.slots.some(s => s.weaponTypeId === 'shield')) wepDmgPctSum += 1.0;
   return { dmg: dmg * (1 + wepDmgPctSum), speed, hasAny };
 }
 

@@ -378,11 +378,12 @@ function slotBlock(slot: Slot) {
   const isParagon = slot.id === 'paragon';
   const isEmpty = slot.affixes.length === 0 && (!isWeapon || (slot.weaponTypeId ?? 'none') === 'none');
 
-  // Collapsed row for empty non-weapon, non-paragon, non-armor-gem slots.
-  // Armor-gem slots (helm/chest/pants) always show the expanded view so the user can toggle
-  // gem sockets even when no affixes are entered (e.g., a defense-only chest piece with gems).
-  const isArmorGemSlotEarly = (new Set(['helm', 'chest', 'pants'])).has(slot.id);
-  if (isEmpty && !isWeapon && !isParagon && !isArmorGemSlotEarly) {
+  // Slots eligible for a pinned legendary aspect row (essentially all armor / jewelry / weapons).
+  // We expand these even when empty so the user always sees the aspect placeholder + gem rows.
+  // Charms / seal / glyphs / set bonus do NOT carry aspects, so they keep the collapsed-when-empty behavior.
+  const GEAR_SLOTS = new Set(['helm','chest','pants','boots','gloves','amulet','ring1','ring2','wep1','wep2','wep3','wep4']);
+  const isGearSlot = GEAR_SLOTS.has(slot.id);
+  if (isEmpty && !isWeapon && !isParagon && !isGearSlot) {
     const row = el('div', { class: 'flex items-center justify-between gap-3 py-1.5 px-3 mb-1 border border-zinc-800/60 rounded text-sm hover:border-zinc-700 transition-colors' });
     row.append(el('span', { class: 'text-zinc-500' }, slot.name));
     const addBtn = el('button', { class: 'text-xs text-amber-400 hover:text-amber-300 px-2 py-0.5 rounded border border-amber-700/50' }, '+ Add Affix');
@@ -426,18 +427,15 @@ function slotBlock(slot: Slot) {
   header.append(addBtn);
   wrap.append(header);
 
-  // Shield-specific reminder: every shield in D4 has an innate "+% Weapon Damage Bonus" that's easy to miss
-  // because the calculator can't read it for you. Surface a hint when no WEPDMG_PCT affix is entered
-  // on the shield slot so the user knows to add it.
+  // Shield-specific note: every D4 shield has an innate +100% Weapon Damage Bonus, and the calc
+  // auto-applies it. Surface a small info note so users know it's already counted (and don't
+  // re-add it manually).
   if (isWeapon && slot.weaponTypeId === 'shield') {
-    const hasWepDmgPct = slot.affixes.some(a => a.bucket === 'WEPDMG_PCT');
-    if (!hasWepDmgPct) {
-      wrap.append(el('div', { class: 'mb-2 px-2 py-1.5 text-[11px] rounded border border-amber-500/30 bg-amber-500/5 text-amber-200/90' },
-        '⚠️ Shields have an innate ',
-        el('span', { class: 'font-semibold' }, '+% Weapon Damage Bonus'),
-        ' (read it off the shield tooltip in-game). Add it below as a “+% Weapon Damage Bonus” affix or your damage will be way off.',
-      ));
-    }
+    wrap.append(el('div', { class: 'mb-2 px-2 py-1.5 text-[11px] rounded border border-emerald-500/30 bg-emerald-500/5 text-emerald-200/90' },
+      '✓ Shield innate ',
+      el('span', { class: 'font-semibold' }, '+100% Weapon Damage Bonus'),
+      ' is auto-applied. Do not add it again. Aspect bonuses on top of it (rare) can still be added as a “+% Weapon Damage Bonus” affix.',
+    ));
   }
 
   // Armor gems live on helm, chest, pants; weapon gems live on weapon slots.
@@ -472,7 +470,11 @@ function slotBlock(slot: Slot) {
   // them in weapon slots; calc still sums them so damage numbers don't change silently.
   const isLegacyWeaponGem = (a: { bucket: Bucket; label?: string }) =>
     isWeaponGemSlot && a.bucket === 'GEM' && !WEAPON_GEM_LABELS.includes(a.label ?? '');
-  const visibleAffixes = slot.affixes.map((a, i) => ({ a, i })).filter(({ a }) => !isHiddenGemAffix(a) && !isLegacyWeaponGem(a));
+  // Hide the pinned legendary aspect EXTRAMULT (matched by label prefix) so it doesn't double-render in the affix list.
+  const ASPECT_LABEL_KEY = 'Legendary Aspect';
+  const isPinnedAspect = (a: { bucket: Bucket; label?: string }) =>
+    a.bucket === 'EXTRAMULT' && !!a.label && (a.label === ASPECT_LABEL_KEY || a.label.startsWith(ASPECT_LABEL_KEY + ':'));
+  const visibleAffixes = slot.affixes.map((a, i) => ({ a, i })).filter(({ a }) => !isHiddenGemAffix(a) && !isLegacyWeaponGem(a) && !isPinnedAspect(a));
 
   if (visibleAffixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
 
@@ -591,6 +593,71 @@ function slotBlock(slot: Slot) {
 
       wrap.append(gemRow);
     });
+  }
+
+  // Pinned legendary aspect row on gear slots. Most build damage comes from stacked aspects/uniques,
+  // and forgetting to enter them is the #1 reason calculated damage is way lower than in-game.
+  // Same UX as gem rows: checkbox to enable, x% input, label input. Stored as a slot-local
+  // EXTRAMULT affix with the well-known label "Legendary Aspect" so we can find / round-trip it.
+  if (isGearSlot) {
+    const ASPECT_LABEL_KEY = 'Legendary Aspect';
+    const findAspect = () => slot.affixes.find(a => a.bucket === 'EXTRAMULT' && a.label === ASPECT_LABEL_KEY);
+    const existingAspect = findAspect();
+    let lastValue = existingAspect?.value ?? 0;
+    let lastLabel = existingAspect?.label ?? ASPECT_LABEL_KEY;
+    void lastLabel;
+    const aspectRow = el('div', { class: 'flex items-center gap-2 mb-1 mt-1 pt-1 border-t border-zinc-800/60 text-sm flex-wrap sm:flex-nowrap' });
+    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500 shrink-0' }) as HTMLInputElement;
+    cb.checked = !!existingAspect;
+    aspectRow.append(cb);
+    aspectRow.append(el('span', { class: 'text-zinc-400 w-16 shrink-0', title: 'Legendary aspect (or unique effect) on this item. Most are an x% multiplier (own bucket). Enter the % from the aspect tooltip.' }, 'Aspect'));
+    const prefix = el('span', { class: 'text-zinc-500 text-sm' }, 'x');
+    const input = pctInput(
+      () => findAspect()?.value ?? lastValue,
+      v => { lastValue = v; const a = findAspect(); if (a) a.value = v; },
+      { w: 'w-16 text-right' }) as HTMLInputElement;
+    const suffix = el('span', { class: 'text-zinc-500 text-sm' }, '%');
+    aspectRow.append(prefix, input, suffix);
+    // Optional descriptor text input. Stored as a label suffix so users remember which aspect this is.
+    const desc = el('input', { type: 'text', placeholder: 'e.g. of Berserk Ripping, Herald of Zakarum unique', class: inputCls() + ' flex-1 min-w-0 text-xs' }) as HTMLInputElement;
+    // Pull the descriptor out of the label if present (label format: 'Legendary Aspect: <desc>' for backward-compat support).
+    desc.value = existingAspect ? (existingAspect.label && existingAspect.label.startsWith(ASPECT_LABEL_KEY + ':') ? existingAspect.label.slice(ASPECT_LABEL_KEY.length + 1).trim() : '') : '';
+    desc.addEventListener('input', () => {
+      const a = findAspect();
+      if (a) {
+        a.label = desc.value.trim() ? `${ASPECT_LABEL_KEY}: ${desc.value.trim()}` : ASPECT_LABEL_KEY;
+        afterInput();
+      }
+    });
+    aspectRow.append(desc);
+
+    const applyAspectDisabled = () => {
+      input.disabled = !cb.checked;
+      desc.disabled = !cb.checked;
+      const dim = !cb.checked;
+      input.classList.toggle('opacity-40', dim);
+      desc.classList.toggle('opacity-40', dim);
+      prefix.classList.toggle('opacity-40', dim);
+      suffix.classList.toggle('opacity-40', dim);
+    };
+    applyAspectDisabled();
+
+    cb.addEventListener('change', () => {
+      const existing = findAspect();
+      if (cb.checked && !existing) {
+        const label = desc.value.trim() ? `${ASPECT_LABEL_KEY}: ${desc.value.trim()}` : ASPECT_LABEL_KEY;
+        slot.affixes.push({ bucket: 'EXTRAMULT', value: lastValue, label });
+      } else if (!cb.checked && existing) {
+        lastValue = existing.value;
+        lastLabel = existing.label ?? ASPECT_LABEL_KEY;
+        slot.affixes.splice(slot.affixes.indexOf(existing), 1);
+      }
+      applyAspectDisabled();
+      input.value = String((findAspect()?.value ?? lastValue) * 100);
+      afterInput();
+    });
+
+    wrap.append(aspectRow);
   }
 
   return wrap;
