@@ -1126,8 +1126,12 @@ function restoreSnapshotBtn() {
   btn.addEventListener('click', () => {
     if (!build.snapshot) return;
     if (!confirm('Replace the current build with the saved one? Unsaved edits will be lost.')) return;
+    // Preserve the saved build on the restored copy so the Save button flips back to green "✓ Saved"
+    // (current == saved) instead of resetting to neutral. Re-saves the same snapshot reference.
+    const savedCopy = cloneBuild(build.snapshot);
+    savedCopy.snapshot = null;
     const restored = cloneBuild(build.snapshot);
-    restored.snapshot = null;
+    restored.snapshot = savedCopy;
     build = restored;
     persist(build);
     mount();
