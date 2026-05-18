@@ -855,8 +855,8 @@ function bucketsCard() {
     rows.push({ affix: 'x10% All / Element Damage Multiplier', gain: weightFor(build, 'ALLM', 0.10, refScenario) });
     rows.push({ affix: '+10% Damage (additive)',            gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) });
     rows.push({ affix: `+100 ${cls.mainStat}`,              gain: weightFor(build, 'MAINSTAT', 100, refScenario) });
+    rows.push({ affix: `+10% ${cls.mainStat}`,              gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) });
     rows.push({ affix: '+100 Weapon Damage',                gain: weightFor(build, 'WEPDMG', 100, refScenario) });
-    rows.push({ affix: '+10% Weapon Damage Bonus',          gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) });
     rows.push({ affix: '+3 Skill Ranks',                    gain: weightFor(build, 'SKILLRANK', 3, refScenario) });
   } else {
     rows.push({ affix: 'x10% Critical Strike Damage Multiplier', gain: weightFor(build, 'CSDM', 0.10, refScenario) });
@@ -865,9 +865,9 @@ function bucketsCard() {
     rows.push({ affix: '+10% Critical Strike Damage',            gain: weightFor(build, 'CRITADD', 0.10, refScenario) });
     rows.push({ affix: '+10% Damage (additive)',                 gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) });
     rows.push({ affix: `+100 ${cls.mainStat}`,                   gain: weightFor(build, 'MAINSTAT', 100, refScenario) });
+    rows.push({ affix: `+10% ${cls.mainStat}`,                   gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) });
     rows.push({ affix: '+5% Critical Strike Chance',             gain: weightFor(build, 'CRITCHANCE', 0.05, refScenario), warn: c.critChance >= 1 ? 'capped' : undefined });
     rows.push({ affix: '+100 Weapon Damage',                     gain: weightFor(build, 'WEPDMG', 100, refScenario) });
-    rows.push({ affix: '+10% Weapon Damage Bonus',               gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) });
     rows.push({ affix: '+3 Skill Ranks',                         gain: weightFor(build, 'SKILLRANK', 3, refScenario) });
   }
   rows.sort((a, b) => b.gain - a.gain);
