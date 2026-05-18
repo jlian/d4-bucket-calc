@@ -528,7 +528,7 @@ function slotBlock(slot: Slot) {
 // ---------- OUTPUT: Scenarios ----------
 // Transient UI state for the scenarios card (not persisted).
 // Vulnerable / Elite default ON since those are the most common targeting assumptions.
-const scenarioState = { vulnerable: true, elites: true, close: false, distant: false, cc: false, healthy: false };
+const scenarioState = { vulnerable: true, elites: true, close: false, distant: false, cc: false };
 
 function scenariosCard() {
   const card = sectionCard('Damage');
@@ -549,7 +549,6 @@ function scenariosCard() {
     { key: 'close',      label: 'Close' },
     { key: 'distant',    label: 'Distant' },
     { key: 'cc',         label: 'CC' },
-    { key: 'healthy',    label: 'Healthy' },
   ];
   for (const t of toggles) {
     const active = !!scenarioState[t.key];

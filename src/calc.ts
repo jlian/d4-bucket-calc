@@ -135,7 +135,6 @@ const ifElites = (s: ScenarioConditions) => !!s.elites;
 const ifClose = (s: ScenarioConditions) => !!s.close;
 const ifDistant = (s: ScenarioConditions) => !!s.distant;
 const ifCC = (s: ScenarioConditions) => !!s.cc;
-const ifHealthy = (s: ScenarioConditions) => !!s.healthy;
 const ifDot = (s: ScenarioConditions) => !!s.isDot;
 
 // Note: in-game order. (No imbuement: it's a Rogue-only line and users can add it via Extra Additive.)
@@ -144,13 +143,11 @@ export const DEFAULT_ADDITIVE_LINES: AdditiveLine[] = [
   { id: 'vulnerable',   label: 'Vulnerable Damage',      value: 0, applies: ifVuln },
   { id: 'all',          label: 'All Damage',             value: 0, applies: alwaysOn },
   { id: 'primaryElem',  label: 'Damage with [Element]',  value: 0, applies: alwaysOn },
-  { id: 'ultimate',     label: 'Damage with Ultimate',   value: 0, applies: alwaysOn },
   { id: 'overTime',     label: 'Damage Over Time',       value: 0, applies: ifDot, isDotOnly: true },
   { id: 'close',        label: 'Damage vs Close',        value: 0, applies: ifClose },
   { id: 'distant',      label: 'Damage vs Distant',      value: 0, applies: ifDistant },
   { id: 'elites',       label: 'Damage vs Elites',       value: 0, applies: ifElites },
   { id: 'cc',           label: 'Damage vs Crowd Controlled', value: 0, applies: ifCC },
-  { id: 'healthy',      label: 'Damage vs Healthy',      value: 0, applies: ifHealthy },
 ];
 
 // Helper that clones default lines without losing function fields (structuredClone can't clone functions)
