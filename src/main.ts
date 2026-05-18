@@ -129,6 +129,17 @@ function mount() {
 }
 
 function refreshOutputs() {
+  // Header holds Save Build / Restore Saved, both of which depend on dirty state vs the saved build.
+  // Re-render it here so live edits (afterInput -> refreshOutputs) update the dirty dot immediately
+  // instead of waiting for a full mount(). Header is replaced wholesale; cheap enough.
+  const headerHost = document.getElementById('app');
+  if (headerHost) {
+    const oldHeader = headerHost.querySelector('header.app-header');
+    if (oldHeader) {
+      const newHeader = renderHeader();
+      oldHeader.replaceWith(newHeader);
+    }
+  }
   const right = document.getElementById('outputs');
   if (right) {
     right.innerHTML = '';
@@ -145,7 +156,7 @@ function refreshOutputs() {
 
 // ---------- Header ----------
 function renderHeader() {
-  return el('header', { class: 'border-b border-zinc-800 px-4 py-3 sticky top-0 bg-zinc-950/95 backdrop-blur z-10' },
+  return el('header', { class: 'app-header border-b border-zinc-800 px-4 py-3 sticky top-0 bg-zinc-950/95 backdrop-blur z-10' },
     el('div', { class: 'max-w-6xl mx-auto flex flex-wrap items-center gap-3 justify-between' },
       el('div', { class: 'flex items-center gap-3' },
         el('span', { class: 'text-2xl' }, '⚔️'),
@@ -659,17 +670,7 @@ function scenariosCard() {
       const sign = delta >= 0 ? '+' : '';
       const cls = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-zinc-500';
       const deltaRow = el('div', { class: 'mt-2 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs gap-2' });
-      const leftSide = el('div', { class: 'flex items-center gap-2 min-w-0' },
-        el('span', { class: 'text-zinc-500' }, '📌 vs saved build:'),
-      );
-      const clearLink = el('button', {
-        type: 'button',
-        class: 'text-[10px] text-zinc-600 hover:text-red-400 transition',
-        title: 'Discard the saved build (current build is unchanged)',
-      }, '✕ clear');
-      clearLink.addEventListener('click', () => { build.snapshot = null; persist(build); mount(); });
-      leftSide.append(clearLink);
-      deltaRow.append(leftSide);
+      deltaRow.append(el('span', { class: 'text-zinc-500' }, '📌 vs saved build:'));
       deltaRow.append(el('span', { class: cls + ' font-bold tabular-nums' }, sign + fmtPct(delta, 2)));
       card.append(deltaRow);
     }
@@ -1119,7 +1120,9 @@ function snapshotBtn() {
 
 function restoreSnapshotBtn() {
   if (!build.snapshot) return el('span', { class: 'hidden' });
-  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Replace the current build with the saved one' }, '↩ Restore Saved');
+  // Only meaningful when current diverges from saved. If they match, there's nothing to restore.
+  if (buildsEqualForCompare(build, build.snapshot)) return el('span', { class: 'hidden' });
+  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Discard current edits and revert to the saved build' }, '↩ Restore Saved');
   btn.addEventListener('click', () => {
     if (!build.snapshot) return;
     if (!confirm('Replace the current build with the saved one? Unsaved edits will be lost.')) return;
