@@ -551,8 +551,6 @@ function scenariosCard() {
     lbl.append(cb, document.createTextNode(t.label));
     toggleWrap.append(lbl);
   }
-  // DoT toggle removed: the calculator now always shows the crit/non-crit/average readout.
-  // Conditional DoT affixes need proper modeling, which is out of scope for now.
   card.append(toggleWrap);
 
   // Compute scenarios
@@ -560,9 +558,11 @@ function scenariosCard() {
   const scenarioHit: any = { id: 'hit',  label: 'hit',  conditions: conds };
   const hitDmg = scenarioDamageNoCrit(build, scenarioHit);
   const critDmg = scenarioCritOnly(build, scenarioHit);
+  const showDot = c.dotm > 1;
+  const dotDmg = showDot ? scenarioDamage(build, { id: 'dot', label: 'dot', conditions: conds, isDot: true } as any) : 0;
 
-  // Big readout (matches in-game: white = hit, yellow = crit)
-  const row = el('div', { class: 'grid grid-cols-2 gap-3 mb-1' });
+  // Big readout (matches in-game: white = hit, yellow = crit, emerald = DoT tick)
+  const row = el('div', { class: showDot ? 'grid grid-cols-3 gap-3 mb-1' : 'grid grid-cols-2 gap-3 mb-1' });
   row.append(el('div', { class: 'text-center' },
     el('div', { class: 'text-xs text-zinc-500' }, 'Hit'),
     el('div', { class: 'text-2xl font-bold text-zinc-100 font-mono' }, fmtBigNum(hitDmg)),
@@ -571,6 +571,12 @@ function scenariosCard() {
     el('div', { class: 'text-xs text-zinc-500' }, 'Crit'),
     el('div', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(critDmg)),
   ));
+  if (showDot) {
+    row.append(el('div', { class: 'text-center', title: 'DoT tick: non-crit hit × Damage Over Time Multiplier. Vulnerable / elite toggles still apply.' },
+      el('div', { class: 'text-xs text-zinc-500' }, 'DoT tick'),
+      el('div', { class: 'text-2xl font-bold text-emerald-400 font-mono' }, fmtBigNum(dotDmg)),
+    ));
+  }
   card.append(row);
 
   {
