@@ -526,7 +526,8 @@ function slotBlock(slot: Slot) {
 }
 
 // ---------- OUTPUT: Scenarios ----------
-// Transient UI state for the scenarios card (not persisted)
+// Transient UI state for the scenarios card (not persisted).
+// Vulnerable / Elite default ON since those are the most common targeting assumptions.
 const scenarioState = { vulnerable: true, elites: true, close: false, distant: false, cc: false, healthy: false };
 
 function scenariosCard() {
@@ -537,11 +538,15 @@ function scenariosCard() {
     return card;
   }
 
-  // Conditional toggles
+  // Conditional toggles (match the in-game conditional additive lines so the user can flip context without leaving the card)
   const toggleWrap = el('div', { class: 'flex flex-wrap gap-x-3 gap-y-1 mb-3' });
   const toggles: { key: keyof typeof scenarioState; label: string }[] = [
     { key: 'vulnerable', label: 'Vulnerable' },
     { key: 'elites',     label: 'Elite' },
+    { key: 'close',      label: 'Close' },
+    { key: 'distant',    label: 'Distant' },
+    { key: 'cc',         label: 'Crowd-Controlled' },
+    { key: 'healthy',    label: 'Healthy' },
   ];
   for (const t of toggles) {
     const lbl = el('label', { class: 'flex items-center gap-1 text-xs text-zinc-400 cursor-pointer' });
@@ -551,35 +556,60 @@ function scenariosCard() {
     lbl.append(cb, document.createTextNode(t.label));
     toggleWrap.append(lbl);
   }
+  // DoT-build toggle: persisted on the build so the rest of the UI (Upgrade Priority, Stats Summary, Formula)
+  // can swap out crit-centric rows for DoT-centric ones. Mechanically: zeroes crit chance for all
+  // calc paths and treats the primary readout as a DoT tick (no crit/avg).
+  {
+    const lbl = el('label', { class: 'flex items-center gap-1 text-xs text-amber-300 cursor-pointer', title: 'DoT skills (Poison Spray, Bleed, Ignite, etc.) cannot crit. Switches the calculator into DoT tick mode: primary readout becomes the DoT tick, additive lines marked “Damage Over Time” get applied, and Upgrade Priority swaps crit-centric affixes for DoT-centric ones.' });
+    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
+    cb.checked = build.disableCrit;
+    cb.addEventListener('change', () => { build.disableCrit = cb.checked; persist(build); mount(); });
+    lbl.append(cb, document.createTextNode('DoT skill (no crit, use DoT tick)'));
+    toggleWrap.append(lbl);
+  }
   card.append(toggleWrap);
 
-  // Compute scenarios
+  // Compute scenarios. In DoT-build mode we don't show crit/avg; the primary readout IS the DoT tick.
   const conds = { ...scenarioState };
-  const scenarioHit: any = { id: 'hit',  label: 'hit',  conditions: conds };
+  const scenarioHit: any = { id: 'hit', label: 'hit', conditions: conds };
+  const scenarioDot: any = { id: 'dot', label: 'dot', conditions: conds, isDot: true };
+  const isDotMode = build.disableCrit;
   const hitDmg = scenarioDamageNoCrit(build, scenarioHit);
-  const critDmg = scenarioCritOnly(build, scenarioHit);
-  const showDot = c.dotm > 1;
-  const dotDmg = showDot ? scenarioDamage(build, { id: 'dot', label: 'dot', conditions: conds, isDot: true } as any) : 0;
+  const critDmg = isDotMode ? 0 : scenarioCritOnly(build, scenarioHit);
+  const dotDmg = scenarioDamage(build, scenarioDot);
+  // Show DoT tick alongside crit when the DoT bucket has any contribution OR there's a DoT-only additive line entered.
+  const dotLinesSum = build.additiveLines.filter(l => (l as any).isDotOnly).reduce((s, l) => s + l.value, 0);
+  const showDotReadout = !isDotMode && (c.dotm > 1 || dotLinesSum > 0);
 
-  // Big readout (matches in-game: white = hit, yellow = crit, emerald = DoT tick)
-  const row = el('div', { class: showDot ? 'grid grid-cols-3 gap-3 mb-1' : 'grid grid-cols-2 gap-3 mb-1' });
-  row.append(el('div', { class: 'text-center' },
-    el('div', { class: 'text-xs text-zinc-500' }, 'Hit'),
-    el('div', { class: 'text-2xl font-bold text-zinc-100 font-mono' }, fmtBigNum(hitDmg)),
-  ));
-  row.append(el('div', { class: 'text-center' },
-    el('div', { class: 'text-xs text-zinc-500' }, 'Crit'),
-    el('div', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(critDmg)),
-  ));
-  if (showDot) {
-    row.append(el('div', { class: 'text-center', title: 'DoT tick: non-crit hit × Damage Over Time Multiplier. Vulnerable / elite toggles still apply.' },
+  // Big readout (matches in-game: white = hit, yellow = crit, emerald = DoT tick).
+  // DoT mode collapses to a single emerald DoT tick number; non-DoT shows Hit / Crit (+ optional DoT tick).
+  let row: HTMLElement;
+  if (isDotMode) {
+    row = el('div', { class: 'grid grid-cols-1 gap-3 mb-1' });
+    row.append(el('div', { class: 'text-center', title: 'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied. Vulnerable / conditional toggles still apply.' },
       el('div', { class: 'text-xs text-zinc-500' }, 'DoT tick'),
-      el('div', { class: 'text-2xl font-bold text-emerald-400 font-mono' }, fmtBigNum(dotDmg)),
+      el('div', { class: 'text-3xl font-bold text-emerald-400 font-mono' }, fmtBigNum(dotDmg)),
     ));
+  } else {
+    row = el('div', { class: showDotReadout ? 'grid grid-cols-3 gap-3 mb-1' : 'grid grid-cols-2 gap-3 mb-1' });
+    row.append(el('div', { class: 'text-center' },
+      el('div', { class: 'text-xs text-zinc-500' }, 'Hit'),
+      el('div', { class: 'text-2xl font-bold text-zinc-100 font-mono' }, fmtBigNum(hitDmg)),
+    ));
+    row.append(el('div', { class: 'text-center' },
+      el('div', { class: 'text-xs text-zinc-500' }, 'Crit'),
+      el('div', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(critDmg)),
+    ));
+    if (showDotReadout) {
+      row.append(el('div', { class: 'text-center', title: 'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied.' },
+        el('div', { class: 'text-xs text-zinc-500' }, 'DoT tick'),
+        el('div', { class: 'text-2xl font-bold text-emerald-400 font-mono' }, fmtBigNum(dotDmg)),
+      ));
+    }
   }
   card.append(row);
 
-  {
+  if (!isDotMode) {
     const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
     card.append(el('div', { class: 'text-center text-sm text-zinc-300 mt-1.5' },
       el('span', { class: 'text-xs text-zinc-500' }, `Average @ ${(c.critChance*100).toFixed(1)}% crit → `),
@@ -587,12 +617,13 @@ function scenariosCard() {
     ));
   }
 
-  // Snapshot delta
+  // Snapshot delta. Compare on the same basis as the primary readout (DoT tick vs hit) so the % delta is meaningful.
   if (build.snapshot) {
     const snapBuild = { ...build.snapshot, snapshot: null } as Build;
-    const snapHit = scenarioDamageNoCrit(snapBuild, scenarioHit);
-    if (snapHit > 0) {
-      const delta = hitDmg / snapHit - 1;
+    const refNow = isDotMode ? dotDmg : hitDmg;
+    const refSnap = isDotMode ? scenarioDamage(snapBuild, scenarioDot) : scenarioDamageNoCrit(snapBuild, scenarioHit);
+    if (refSnap > 0) {
+      const delta = refNow / refSnap - 1;
       const sign = delta >= 0 ? '+' : '';
       const cls = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-zinc-500';
       card.append(el('div', { class: 'mt-2 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs' },
@@ -621,23 +652,39 @@ function bucketsCard() {
     return card;
   }
 
-  const refScenario = { id: 'live', label: 'current scenario', conditions: { ...scenarioState } } as any;
+  const isDotMode = build.disableCrit;
+  // In DoT mode, weights are evaluated against a DoT tick (crit/CSDM are dead, DOTM matters).
+  const refScenario = isDotMode
+    ? { id: 'live', label: 'current DoT scenario', conditions: { ...scenarioState }, isDot: true } as any
+    : { id: 'live', label: 'current scenario', conditions: { ...scenarioState } } as any;
 
   const cls = classFor(build);
   type Row = { affix: string; gain: number; warn?: string };
-  const rows: Row[] = [
-    { affix: 'x10% Critical Strike Damage Multiplier', gain: weightFor(build, 'CSDM', 0.10, refScenario) },
-    { affix: 'x10% Vulnerable Damage Multiplier',      gain: weightFor(build, 'VDM', 0.10, refScenario) },
-    { affix: 'x10% All / Element Damage Multiplier',   gain: weightFor(build, 'ALLM', 0.10, refScenario) },
-    { affix: '+10% Critical Strike Damage',            gain: weightFor(build, 'CRITADD', 0.10, refScenario) },
-    { affix: '+10% Damage (additive)',                 gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) },
-    { affix: `+100 ${cls.mainStat}`,                   gain: weightFor(build, 'MAINSTAT', 100, refScenario) },
-    { affix: `x10% ${cls.mainStat} Multiplier`,        gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) },
-    { affix: '+5% Critical Strike Chance',             gain: weightFor(build, 'CRITCHANCE', 0.05, refScenario), warn: c.critChance >= 1 ? 'capped' : undefined },
-    { affix: '+100 Weapon Damage',                     gain: weightFor(build, 'WEPDMG', 100, refScenario) },
-    { affix: 'x10% Weapon Damage',                     gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) },
-    { affix: '+3 Skill Ranks',                         gain: weightFor(build, 'SKILLRANK', 3, refScenario) },
-  ];
+  const rows: Row[] = [];
+  if (isDotMode) {
+    // DoT-focused affix list: drop crit-related rows, surface DOTM.
+    rows.push({ affix: 'x10% Damage Over Time Multiplier',  gain: weightFor(build, 'DOTM', 0.10, refScenario) });
+    rows.push({ affix: 'x10% Vulnerable Damage Multiplier', gain: weightFor(build, 'VDM', 0.10, refScenario) });
+    rows.push({ affix: 'x10% All / Element Damage Multiplier', gain: weightFor(build, 'ALLM', 0.10, refScenario) });
+    rows.push({ affix: '+10% Damage (additive)',            gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) });
+    rows.push({ affix: `+100 ${cls.mainStat}`,              gain: weightFor(build, 'MAINSTAT', 100, refScenario) });
+    rows.push({ affix: `x10% ${cls.mainStat} Multiplier`,   gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) });
+    rows.push({ affix: '+100 Weapon Damage',                gain: weightFor(build, 'WEPDMG', 100, refScenario) });
+    rows.push({ affix: 'x10% Weapon Damage',                gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) });
+    rows.push({ affix: '+3 Skill Ranks',                    gain: weightFor(build, 'SKILLRANK', 3, refScenario) });
+  } else {
+    rows.push({ affix: 'x10% Critical Strike Damage Multiplier', gain: weightFor(build, 'CSDM', 0.10, refScenario) });
+    rows.push({ affix: 'x10% Vulnerable Damage Multiplier',      gain: weightFor(build, 'VDM', 0.10, refScenario) });
+    rows.push({ affix: 'x10% All / Element Damage Multiplier',   gain: weightFor(build, 'ALLM', 0.10, refScenario) });
+    rows.push({ affix: '+10% Critical Strike Damage',            gain: weightFor(build, 'CRITADD', 0.10, refScenario) });
+    rows.push({ affix: '+10% Damage (additive)',                 gain: weightFor(build, 'ADDITIVE', 0.10, refScenario) });
+    rows.push({ affix: `+100 ${cls.mainStat}`,                   gain: weightFor(build, 'MAINSTAT', 100, refScenario) });
+    rows.push({ affix: `x10% ${cls.mainStat} Multiplier`,        gain: weightFor(build, 'MAINSTAT_PCT', 0.10, refScenario) });
+    rows.push({ affix: '+5% Critical Strike Chance',             gain: weightFor(build, 'CRITCHANCE', 0.05, refScenario), warn: c.critChance >= 1 ? 'capped' : undefined });
+    rows.push({ affix: '+100 Weapon Damage',                     gain: weightFor(build, 'WEPDMG', 100, refScenario) });
+    rows.push({ affix: 'x10% Weapon Damage',                     gain: weightFor(build, 'WEPDMG_PCT', 0.10, refScenario) });
+    rows.push({ affix: '+3 Skill Ranks',                         gain: weightFor(build, 'SKILLRANK', 3, refScenario) });
+  }
   rows.sort((a, b) => b.gain - a.gain);
 
   const table = el('table', { class: 'w-full text-sm' });
@@ -698,9 +745,11 @@ function statsCard() {
 
   // Other additive lines from Baseline Stats (non-crit-only ones). Each entered % shows as its own row.
   // We use the line's user-facing label, prefixed with `+%`, so it reads like a stats-sheet entry.
+  // Skip DoT-only lines in non-DoT mode (they wouldn't apply); skip non-applicable lines if all-zero.
   const baselineAdditiveRows: [string, string][] = [];
   for (const l of build.additiveLines) {
     if (l.isCritOnly) continue;
+    if ((l as any).isDotOnly && !build.disableCrit) continue;
     if (l.value === 0) continue;
     baselineAdditiveRows.push([`+% ${l.label}`, bonus(l.value)]);
   }
@@ -720,19 +769,23 @@ function statsCard() {
   stats.push(['Skill Ranks', String(c.totalSkillRanks)]);
   stats.push(['Skill Damage', ofBase(c.skillCoef)]);
 
+  const isDotMode = build.disableCrit;
+
   // --- Dropdown order (matches the affix select alphabetical sort) ---
-  // + Critical Strike Chance
-  stats.push(['+% Critical Strike Chance', bonus(c.critChance, 1)]);
-  // + Critical Strike Damage (additive, baseline + gear CRITADD combined)
-  if (critDmgAdditive !== 0) stats.push(['+% Critical Strike Damage (crit only)', bonus(critDmgAdditive)]);
-  // Other +% damage lines from Baseline Stats (Vulnerable, All, Element, Elites, etc.)
+  // + Critical Strike Chance (skip entirely in DoT mode — DoTs can't crit)
+  if (!isDotMode) {
+    stats.push(['+% Critical Strike Chance', bonus(c.critChance, 1)]);
+    if (critDmgAdditive !== 0) stats.push(['+% Critical Strike Damage (crit only)', bonus(critDmgAdditive)]);
+  }
+  // Other +% damage lines from Baseline Stats (Vulnerable, All, Element, Elites, etc.).
+  // In DoT mode, also surface the DoT-only line(s); in hit/crit mode, hide them (they wouldn't apply).
   for (const r of baselineAdditiveRows) stats.push(r);
   // x% multipliers in alphabetical order (matches dropdown). Weapon gem already sums into the
   // ALLM bucket internally, so it's reflected in the All / Element row; no separate gem row needed.
   stats.push(['x% All / Element Damage Multiplier', bonus(c.allm - 1)]);
-  stats.push(['x% Critical Strike Damage Multiplier', bonus(c.csdm - 1)]);
-  // DoT and Non-Physical only if relevant.
-  if (c.dotm > 1) stats.push(['x% Damage Over Time Multiplier', bonus(c.dotm - 1)]);
+  if (!isDotMode) stats.push(['x% Critical Strike Damage Multiplier', bonus(c.csdm - 1)]);
+  // DoT bucket always shown in DoT mode (even if 0, so user sees the dial they'd be tuning); otherwise only if non-trivial.
+  if (isDotMode || c.dotm > 1) stats.push(['x% Damage Over Time Multiplier', bonus(c.dotm - 1)]);
   if (nonPhysSum !== 0) stats.push(['x% Non-Physical Damage', bonus(nonPhysSum)]);
   stats.push(['x% Vulnerable Damage Multiplier', bonus(c.vdm - 1)]);
 
@@ -844,15 +897,20 @@ function buildPluggedIn(): HTMLElement {
     return wrap;
   }
   const cls = classFor(build);
+  const isDotMode = build.disableCrit;
   // Use the same scenario state as the Damage card so user can experiment from one place.
+  // In DoT mode, additive is computed with isDot=true so DoT-only lines (Damage Over Time) get included
+  // and crit-only lines get excluded — matches what `scenarioDamage` actually does.
   const conds = { ...scenarioState };
-  const additive = additiveForScenario(build, conds);
-  const critAdd = critOnlyAdditive(build);
+  const dotConds: any = { ...conds, isDot: isDotMode };
+  const additive = additiveForScenario(build, dotConds);
+  const critAdd = isDotMode ? 0 : critOnlyAdditive(build);
   const vdmFactor = conds.vulnerable ? c.vdm * 1.2 : 1;
   const base = c.weaponDmg * c.mainStatMult * vdmFactor * c.allm * c.skillCoef * c.extraMultProduct * build.enemyDamageFactor;
   const nonCritDmg = base * (1 + additive);
   const critDmg = base * (1 + additive + critAdd) * c.csdm * 1.5;
-  const avgDmg = critDmg * c.critChance + nonCritDmg * (1 - c.critChance);
+  const dotDmg = base * (1 + additive) * c.dotm;
+  const avgDmg = isDotMode ? dotDmg : (critDmg * c.critChance + nonCritDmg * (1 - c.critChance));
 
   // Format numbers without comma thousand separators (math notation), with fixed decimals
   const dec = (n: number, d = 2) => n.toFixed(d);
@@ -869,7 +927,8 @@ function buildPluggedIn(): HTMLElement {
   type RowDesc = string | (string | Node)[];
   type Row = [string, RowDesc, string, number];
   const usedAdd = additive + critAdd;
-  const addMath = additiveBreakdownMath(build, conds, true);
+  // additiveBreakdownMath needs to know which conditional lines to include. In DoT mode, pass isDot=true via conds.
+  const addMath = additiveBreakdownMath(build, dotConds, !isDotMode);
   // Skill coef step formula at N total ranks: base × (1 + 0.10 × (N - floor(N/5) - 1) + 0.15 × floor(N/5))
   const N = c.totalSkillRanks;
   const f = Math.floor(N / 5);
@@ -903,9 +962,17 @@ function buildPluggedIn(): HTMLElement {
       'Product of standalone aspect/unique multipliers. Each one is its own factor.',
       extraMultMath(build), c.extraMultProduct],
   ];
-  rows.push([String.raw`(1.5 \cdot M_{crit})^c`,
-    ['Crit factor: ', katexInline('1.5'), ' inherent crit baseline times the Critical Strike Damage Multiplier bucket. Active only on crit hits (', katexInline('c = 1'), ').'],
-    `1.5 × (${csdmMath})`, c.csdm * 1.5]);
+  // Crit / DoT factor: swap rows based on mode. Both branches keep the same overall row count
+  // so the formula card layout stays consistent.
+  if (isDotMode) {
+    rows.push([String.raw`M_{dot}^d`,
+      ['DoT factor: Damage Over Time Multiplier bucket. Active only on DoT ticks (', katexInline('d = 1'), '). Crit factor is inactive because DoT skills cannot crit.'],
+      bucketBreakdownMath(build, 'DOTM'), c.dotm]);
+  } else {
+    rows.push([String.raw`(1.5 \cdot M_{crit})^c`,
+      ['Crit factor: ', katexInline('1.5'), ' inherent crit baseline times the Critical Strike Damage Multiplier bucket. Active only on crit hits (', katexInline('c = 1'), ').'],
+      `1.5 × (${csdmMath})`, c.csdm * 1.5]);
+  }
   rows.push([String.raw`(1.2 \cdot M_{vuln})^v`,
     ['Vulnerable factor: ', katexInline('1.2'), ' inherent vuln baseline times the Vulnerable Damage Multiplier bucket. Active only against vulnerable targets (', katexInline('v = 1'), ').'],
     conds.vulnerable ? `1.2 × (${vdmMath})` : 'inactive (v = 0)', vdmFactor]);
@@ -934,12 +1001,20 @@ function buildPluggedIn(): HTMLElement {
   // (Dropped the substituted equation walk-through. Rounding to 2 decimals across 9+ factors
   // accumulates ~0.5% drift, which made the printed result not match a calculator. The precise
   // value below is from internal full-precision math.)
-  // Big result (precise, from internal full-precision math)
-  wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
-    el('span', { class: 'text-sm text-zinc-300' }, `Crit hit damage`),
-    el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(critDmg)),
-  ));
-  wrap.append(el('div', { class: 'text-xs text-zinc-500 mt-2' }, `Average (with ${(c.critChance*100).toFixed(0)}% crit chance) = ${fmtBigNum(avgDmg)}`));
+  // Big result (precise, from internal full-precision math). DoT mode shows the DoT tick directly
+  // and skips the average-with-crit footer since crit chance is forced to 0.
+  if (isDotMode) {
+    wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
+      el('span', { class: 'text-sm text-zinc-300' }, 'DoT tick damage'),
+      el('span', { class: 'text-2xl font-bold text-emerald-400 font-mono' }, fmtBigNum(dotDmg)),
+    ));
+  } else {
+    wrap.append(el('div', { class: 'mt-3 pt-3 border-t border-zinc-800 flex items-baseline justify-between' },
+      el('span', { class: 'text-sm text-zinc-300' }, `Crit hit damage`),
+      el('span', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(critDmg)),
+    ));
+    wrap.append(el('div', { class: 'text-xs text-zinc-500 mt-2' }, `Average (with ${(c.critChance*100).toFixed(0)}% crit chance) = ${fmtBigNum(avgDmg)}`));
+  }
   void hi; // unused helper
   return wrap;
 }
