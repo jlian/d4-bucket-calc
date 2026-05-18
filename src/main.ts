@@ -538,9 +538,62 @@ function scenariosCard() {
     return card;
   }
 
+  // Compute scenarios. In DoT-build mode we don't show crit/avg; the primary readout IS the DoT tick.
+  const conds = { ...scenarioState };
+  const scenarioHit: any = { id: 'hit', label: 'hit', conditions: conds };
+  const scenarioDot: any = { id: 'dot', label: 'dot', conditions: conds, isDot: true };
+  const isDotMode = build.disableCrit;
+  const hitDmg = scenarioDamageNoCrit(build, scenarioHit);
+  const critDmg = isDotMode ? 0 : scenarioCritOnly(build, scenarioHit);
+  const dotDmg = scenarioDamage(build, scenarioDot);
+  // Show DoT tick alongside crit when the DoT bucket has any contribution OR there's a DoT-only additive line entered.
+  const dotLinesSum = build.additiveLines.filter(l => (l as any).isDotOnly).reduce((s, l) => s + l.value, 0);
+  const showDotReadout = !isDotMode && (c.dotm > 1 || dotLinesSum > 0);
+
+  // ----- Readouts come first so the answer is the first thing the eye lands on. -----
+  // Each cell sits in its own subtle card; Hit / Crit / DoT colors match in-game text colors.
+  const readoutCellCls = 'rounded-lg bg-zinc-950/40 border border-zinc-800/80 px-3 py-3 text-center';
+  const labelCls = 'text-[10px] uppercase tracking-wider text-zinc-500 mb-1';
+  const cell = (label: string, value: string, valueCls: string, title?: string) => {
+    const attrs: any = { class: readoutCellCls };
+    if (title) attrs.title = title;
+    return el('div', attrs,
+      el('div', { class: labelCls }, label),
+      el('div', { class: 'text-2xl sm:text-3xl font-bold font-mono leading-tight ' + valueCls }, value),
+    );
+  };
+  let row: HTMLElement;
+  if (isDotMode) {
+    row = el('div', { class: 'grid grid-cols-1 gap-2 mb-2' });
+    row.append(cell('DoT tick', fmtBigNum(dotDmg), 'text-emerald-400',
+      'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied. Vulnerable / conditional toggles still apply.'));
+  } else {
+    row = el('div', { class: showDotReadout ? 'grid grid-cols-3 gap-2 mb-2' : 'grid grid-cols-2 gap-2 mb-2' });
+    row.append(cell('Hit',  fmtBigNum(hitDmg),  'text-zinc-100'));
+    row.append(cell('Crit', fmtBigNum(critDmg), 'text-amber-400'));
+    if (showDotReadout) {
+      row.append(cell('DoT tick', fmtBigNum(dotDmg), 'text-emerald-400',
+        'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied.'));
+    }
+  }
+  card.append(row);
+
+  // Average band: framed strip under the readouts so the headline number sits in its own zone
+  // instead of trailing off as small text. Crit-chance shown as a dim pill on the left.
+  if (!isDotMode) {
+    const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
+    const avgBand = el('div', { class: 'mt-1 mb-3 rounded-lg bg-amber-500/5 border border-amber-500/20 px-3 py-2 flex items-center justify-between gap-3' });
+    avgBand.append(el('div', { class: 'flex items-center gap-2' },
+      el('span', { class: labelCls + ' !mb-0' }, 'Average'),
+      el('span', { class: 'text-[10px] text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-800/80 tabular-nums' }, `${(c.critChance*100).toFixed(1)}% crit`),
+    ));
+    avgBand.append(el('span', { class: 'text-xl sm:text-2xl font-bold font-mono text-amber-300 tabular-nums' }, fmtBigNum(avg)));
+    card.append(avgBand);
+  }
+
+  // ----- Controls below the answer: target chips, then mode chip. -----
   // Conditional toggles styled as pill chips: active = amber, inactive = zinc.
-  // Reads as a single "Target:" row, matching how the in-game conditional additive lines are framed.
-  const togglesRow = el('div', { class: 'mb-3 flex items-center gap-2 flex-wrap' });
+  const togglesRow = el('div', { class: 'pt-3 mt-1 border-t border-zinc-800/80 flex items-center gap-2 flex-wrap' });
   togglesRow.append(el('span', { class: 'text-[10px] uppercase tracking-wide text-zinc-500 mr-1' }, 'Target'));
   const chipsWrap = el('div', { class: 'flex flex-wrap gap-1.5' });
   const toggles: { key: keyof typeof scenarioState; label: string }[] = [
@@ -566,10 +619,9 @@ function scenariosCard() {
   togglesRow.append(chipsWrap);
   card.append(togglesRow);
 
-  // DoT-build mode pill: separate row so it reads as a build-wide mode switch, not just another conditional.
-  // Emerald accent when on, neutral when off.
+  // DoT-build mode pill: own row so it reads as a build-wide mode switch, not just another conditional.
   {
-    const dotRow = el('div', { class: 'mb-4 flex items-center gap-2 flex-wrap' });
+    const dotRow = el('div', { class: 'mt-2 flex items-center gap-2 flex-wrap' });
     dotRow.append(el('span', { class: 'text-[10px] uppercase tracking-wide text-zinc-500 mr-1' }, 'Mode'));
     const on = build.disableCrit;
     const dotChip = el('button', {
@@ -587,54 +639,6 @@ function scenariosCard() {
     dotChip.addEventListener('click', () => { build.disableCrit = !build.disableCrit; persist(build); mount(); });
     dotRow.append(dotChip);
     card.append(dotRow);
-  }
-
-  // Compute scenarios. In DoT-build mode we don't show crit/avg; the primary readout IS the DoT tick.
-  const conds = { ...scenarioState };
-  const scenarioHit: any = { id: 'hit', label: 'hit', conditions: conds };
-  const scenarioDot: any = { id: 'dot', label: 'dot', conditions: conds, isDot: true };
-  const isDotMode = build.disableCrit;
-  const hitDmg = scenarioDamageNoCrit(build, scenarioHit);
-  const critDmg = isDotMode ? 0 : scenarioCritOnly(build, scenarioHit);
-  const dotDmg = scenarioDamage(build, scenarioDot);
-  // Show DoT tick alongside crit when the DoT bucket has any contribution OR there's a DoT-only additive line entered.
-  const dotLinesSum = build.additiveLines.filter(l => (l as any).isDotOnly).reduce((s, l) => s + l.value, 0);
-  const showDotReadout = !isDotMode && (c.dotm > 1 || dotLinesSum > 0);
-
-  // Big readout. Each cell sits in its own subtle card so the numbers feel grouped instead of
-  // floating in space. Hit / Crit / DoT colors match in-game text colors.
-  const readoutCellCls = 'rounded-lg bg-zinc-950/40 border border-zinc-800/80 px-3 py-3 text-center';
-  const labelCls = 'text-[10px] uppercase tracking-wider text-zinc-500 mb-1';
-  const cell = (label: string, value: string, valueCls: string, title?: string) => {
-    const attrs: any = { class: readoutCellCls };
-    if (title) attrs.title = title;
-    return el('div', attrs,
-      el('div', { class: labelCls }, label),
-      el('div', { class: 'text-2xl sm:text-3xl font-bold font-mono leading-tight ' + valueCls }, value),
-    );
-  };
-  let row: HTMLElement;
-  if (isDotMode) {
-    row = el('div', { class: 'grid grid-cols-1 gap-2 mb-1' });
-    row.append(cell('DoT tick', fmtBigNum(dotDmg), 'text-emerald-400',
-      'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied. Vulnerable / conditional toggles still apply.'));
-  } else {
-    row = el('div', { class: showDotReadout ? 'grid grid-cols-3 gap-2 mb-1' : 'grid grid-cols-2 gap-2 mb-1' });
-    row.append(cell('Hit',  fmtBigNum(hitDmg),  'text-zinc-100'));
-    row.append(cell('Crit', fmtBigNum(critDmg), 'text-amber-400'));
-    if (showDotReadout) {
-      row.append(cell('DoT tick', fmtBigNum(dotDmg), 'text-emerald-400',
-        'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied.'));
-    }
-  }
-  card.append(row);
-
-  if (!isDotMode) {
-    const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
-    card.append(el('div', { class: 'text-center text-sm text-zinc-300 mt-2.5' },
-      el('span', { class: 'text-xs text-zinc-500' }, `Average @ ${(c.critChance*100).toFixed(1)}% crit → `),
-      el('span', { class: 'text-zinc-100 font-mono font-semibold' }, fmtBigNum(avg)),
-    ));
   }
 
   // Snapshot delta. Compare on the same basis as the primary readout (DoT tick vs hit) so the % delta is meaningful.
