@@ -648,7 +648,7 @@ function scenariosCard() {
       const sign = delta >= 0 ? '+' : '';
       const cls = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-zinc-500';
       card.append(el('div', { class: 'mt-2 pt-2 border-t border-zinc-800 flex items-center justify-between text-xs' },
-        el('span', { class: 'text-zinc-500' }, '📌 vs snapshot:'),
+        el('span', { class: 'text-zinc-500' }, '📌 vs saved build:'),
         el('span', { class: cls + ' font-bold tabular-nums' }, sign + fmtPct(delta, 2)),
       ));
     }
@@ -1067,11 +1067,11 @@ function copyShareBtn() {
 
 function snapshotBtn() {
   if (build.snapshot) {
-    const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-100', title: 'Stop comparing against the snapshot (does not change current build)' }, '📌 Clear Snapshot');
+    const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-100', title: 'Discard the saved build (current build is unchanged)' }, '🗑 Clear Saved');
     btn.addEventListener('click', () => { build.snapshot = null; persist(build); mount(); });
     return btn;
   }
-  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Freeze current build to compare against future changes' }, '📌 Snapshot');
+  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Save the current build so you can compare future edits against it' }, '💾 Save Build');
   btn.addEventListener('click', () => {
     const snap = cloneBuild(build); snap.snapshot = null;
     build.snapshot = snap;
@@ -1083,10 +1083,10 @@ function snapshotBtn() {
 
 function restoreSnapshotBtn() {
   if (!build.snapshot) return el('span', { class: 'hidden' });
-  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Revert current build to the snapshot state' }, '↩ Restore');
+  const btn = el('button', { class: 'text-xs px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300', title: 'Replace the current build with the saved one' }, '↩ Restore Saved');
   btn.addEventListener('click', () => {
     if (!build.snapshot) return;
-    if (!confirm('Revert current build to the snapshot? Unsnapshot edits will be lost.')) return;
+    if (!confirm('Replace the current build with the saved one? Unsaved edits will be lost.')) return;
     const restored = cloneBuild(build.snapshot);
     restored.snapshot = null;
     build = restored;
@@ -1107,7 +1107,7 @@ function loadSampleBtn() {
   btn.addEventListener('click', () => {
     const isEmpty = build.baseMainStat === 0 && build.skillDamagePct === 0
       && build.slots.every(s => s.affixes.length === 0 && (s.weaponTypeId ?? 'none') === 'none');
-    if (!isEmpty && !confirm('Replace the current build with the sample? Your current build will be lost (Snapshot/Reset can recover it).')) return;
+    if (!isEmpty && !confirm('Replace the current build with the sample? Your current build will be lost (Save Build / Reset can recover it).')) return;
     const parsed = importJsonObject(samplePaladin);
     if (!parsed) { alert('Sample build failed to load. (Bug, please report.)'); return; }
     build = parsed;
