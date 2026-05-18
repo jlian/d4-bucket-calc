@@ -330,24 +330,8 @@ const CLASS_HINTS: Record<string, string> = {
 };
 
 function paragonContributionsCard() {
-  const card = sectionCard('Other Buffs & Multipliers',
-    'Anything that contributes damage outside of gear, charms, glyphs, and the stats sheet. Skills, paragon nodes, key passives, class mechanics, auras, sacrifices, and similar. Add one row per source. Skip anything whose % already shows up on the stats sheet, it\u2019s already counted above.');
-
-  // Big warning callout. End-game builds frequently combine 100-1000x worth of multipliers here
-  // (paragon Castle node alone is x2.00), and missing them silently understates damage by orders of magnitude.
-  // This is the #1 reason real in-game damage doesn't match the tool's output.
-  card.append(el('div', { class: 'mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200' },
-    el('div', { class: 'font-semibold mb-1' }, '\u26a0\ufe0f This is where most builds lose damage'),
-    el('div', { class: 'text-amber-200/90 leading-relaxed' },
-      'Standalone [x]% multipliers (paragon nodes like ',
-      el('span', { class: 'font-semibold' }, 'Castle (+100% global damage)'),
-      ', aspects, uniques, key passives, set bonuses, auras) are NOT shown on your in-game stats sheet. You have to enter each one as a ',
-      el('span', { class: 'font-mono text-amber-100' }, 'Custom [x]%'),
-      ' affix below. A typical end-game build stacks these into a ',
-      el('span', { class: 'font-semibold' }, 'x100\u2013x1000+'),
-      ' combined factor. If your calculated damage is way lower than what you actually hit for in-game, you\u2019re probably missing several of these.',
-    ),
-  ));
+  const card = sectionCard('Paragon & Other Multipliers',
+    'Paragon legendary / rare nodes, key passives, class mechanics, auras, sacrifices, and any other long-tail damage sources that aren\u2019t already covered by gear aspects, glyphs, charms, or your stats sheet. Add one row per source.');
 
   const hint = CLASS_HINTS[build.classId];
   if (hint) {
@@ -358,15 +342,15 @@ function paragonContributionsCard() {
   const slot = build.slots.find(s => s.id === 'paragon');
   if (slot) card.append(slotBlock(slot));
 
-  // Running total of Custom [x]% multipliers entered. Empty = silent; any value gets an emerald chip
-  // showing the combined x-factor so the user sees the cumulative effect at a glance.
+  // Running total of Custom [x]% multipliers entered IN THIS SLOT. (The Stats Summary card shows
+  // the build-wide combined factor; this one is scoped to paragon/other so users see the local effect.)
   if (slot) {
     const factors = slot.affixes.filter(a => a.bucket === 'EXTRAMULT' && a.value !== 0);
     if (factors.length > 0) {
       const combined = factors.reduce((p, a) => p * (1 + a.value), 1);
-      card.append(el('div', { class: 'mt-2 flex items-center justify-between text-xs px-3 py-2 rounded bg-emerald-500/10 border border-emerald-500/30' },
-        el('span', { class: 'text-emerald-300/80' }, `Combined Custom [x]% factor (${factors.length} source${factors.length === 1 ? '' : 's'})`),
-        el('span', { class: 'text-emerald-300 font-mono font-bold tabular-nums' }, `\u00d7${combined.toFixed(2)}`),
+      card.append(el('div', { class: 'mt-2 flex items-center justify-between text-xs px-3 py-2 rounded bg-zinc-800/60 border border-zinc-700' },
+        el('span', { class: 'text-zinc-400' }, `Paragon / other combined [x]% factor (${factors.length} source${factors.length === 1 ? '' : 's'})`),
+        el('span', { class: 'text-zinc-200 font-mono font-bold tabular-nums' }, `\u00d7${combined.toFixed(2)}`),
       ));
     }
   }
@@ -527,6 +511,71 @@ function slotBlock(slot: Slot) {
     wrap.append(row);
   });
 
+  // Pinned legendary aspect row on gear slots. Most build damage comes from stacked aspects/uniques,
+  // and forgetting to enter them is the #1 reason calculated damage is way lower than in-game.
+  // Same UX as gem rows: checkbox to enable, x% input, label input. Stored as a slot-local
+  // EXTRAMULT affix with the well-known label "Legendary Aspect" so we can find / round-trip it.
+  if (isGearSlot) {
+    const ASPECT_LABEL_KEY = 'Legendary Aspect';
+    const findAspect = () => slot.affixes.find(a => a.bucket === 'EXTRAMULT' && a.label === ASPECT_LABEL_KEY);
+    const existingAspect = findAspect();
+    let lastValue = existingAspect?.value ?? 0;
+    let lastLabel = existingAspect?.label ?? ASPECT_LABEL_KEY;
+    void lastLabel;
+    const aspectRow = el('div', { class: 'flex items-center gap-2 mb-1 mt-1 pt-1 border-t border-zinc-800/60 text-sm flex-wrap sm:flex-nowrap' });
+    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500 shrink-0' }) as HTMLInputElement;
+    cb.checked = !!existingAspect;
+    aspectRow.append(cb);
+    aspectRow.append(el('span', { class: 'text-zinc-400 w-16 shrink-0', title: 'Legendary aspect (or unique effect) on this item. Most are an x% multiplier (own bucket). Enter the % from the aspect tooltip.' }, 'Aspect'));
+    const prefix = el('span', { class: 'text-zinc-500 text-sm' }, 'x');
+    const input = pctInput(
+      () => findAspect()?.value ?? lastValue,
+      v => { lastValue = v; const a = findAspect(); if (a) a.value = v; },
+      { w: 'w-16 text-right' }) as HTMLInputElement;
+    const suffix = el('span', { class: 'text-zinc-500 text-sm' }, '%');
+    aspectRow.append(prefix, input, suffix);
+    // Optional descriptor text input. Stored as a label suffix so users remember which aspect this is.
+    const desc = el('input', { type: 'text', placeholder: 'e.g. of Berserk Ripping, Herald of Zakarum unique', class: inputCls() + ' flex-1 min-w-0 text-xs' }) as HTMLInputElement;
+    // Pull the descriptor out of the label if present (label format: 'Legendary Aspect: <desc>' for backward-compat support).
+    desc.value = existingAspect ? (existingAspect.label && existingAspect.label.startsWith(ASPECT_LABEL_KEY + ':') ? existingAspect.label.slice(ASPECT_LABEL_KEY.length + 1).trim() : '') : '';
+    desc.addEventListener('input', () => {
+      const a = findAspect();
+      if (a) {
+        a.label = desc.value.trim() ? `${ASPECT_LABEL_KEY}: ${desc.value.trim()}` : ASPECT_LABEL_KEY;
+        afterInput();
+      }
+    });
+    aspectRow.append(desc);
+
+    const applyAspectDisabled = () => {
+      input.disabled = !cb.checked;
+      desc.disabled = !cb.checked;
+      const dim = !cb.checked;
+      input.classList.toggle('opacity-40', dim);
+      desc.classList.toggle('opacity-40', dim);
+      prefix.classList.toggle('opacity-40', dim);
+      suffix.classList.toggle('opacity-40', dim);
+    };
+    applyAspectDisabled();
+
+    cb.addEventListener('change', () => {
+      const existing = findAspect();
+      if (cb.checked && !existing) {
+        const label = desc.value.trim() ? `${ASPECT_LABEL_KEY}: ${desc.value.trim()}` : ASPECT_LABEL_KEY;
+        slot.affixes.push({ bucket: 'EXTRAMULT', value: lastValue, label });
+      } else if (!cb.checked && existing) {
+        lastValue = existing.value;
+        lastLabel = existing.label ?? ASPECT_LABEL_KEY;
+        slot.affixes.splice(slot.affixes.indexOf(existing), 1);
+      }
+      applyAspectDisabled();
+      input.value = String((findAspect()?.value ?? lastValue) * 100);
+      afterInput();
+    });
+
+    wrap.append(aspectRow);
+  }
+
   // Gem sockets: armor (helm/chest/pants) sockets a +MAINSTAT gem; weapons socket Royal gems
   // (1 for 1H/shield, 2 for 2H) which land in the GEM bucket (sums into All / Element).
   // Rendering mirrors the in-game item tooltip: a single row per gem, no section header,
@@ -595,70 +644,6 @@ function slotBlock(slot: Slot) {
     });
   }
 
-  // Pinned legendary aspect row on gear slots. Most build damage comes from stacked aspects/uniques,
-  // and forgetting to enter them is the #1 reason calculated damage is way lower than in-game.
-  // Same UX as gem rows: checkbox to enable, x% input, label input. Stored as a slot-local
-  // EXTRAMULT affix with the well-known label "Legendary Aspect" so we can find / round-trip it.
-  if (isGearSlot) {
-    const ASPECT_LABEL_KEY = 'Legendary Aspect';
-    const findAspect = () => slot.affixes.find(a => a.bucket === 'EXTRAMULT' && a.label === ASPECT_LABEL_KEY);
-    const existingAspect = findAspect();
-    let lastValue = existingAspect?.value ?? 0;
-    let lastLabel = existingAspect?.label ?? ASPECT_LABEL_KEY;
-    void lastLabel;
-    const aspectRow = el('div', { class: 'flex items-center gap-2 mb-1 mt-1 pt-1 border-t border-zinc-800/60 text-sm flex-wrap sm:flex-nowrap' });
-    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500 shrink-0' }) as HTMLInputElement;
-    cb.checked = !!existingAspect;
-    aspectRow.append(cb);
-    aspectRow.append(el('span', { class: 'text-zinc-400 w-16 shrink-0', title: 'Legendary aspect (or unique effect) on this item. Most are an x% multiplier (own bucket). Enter the % from the aspect tooltip.' }, 'Aspect'));
-    const prefix = el('span', { class: 'text-zinc-500 text-sm' }, 'x');
-    const input = pctInput(
-      () => findAspect()?.value ?? lastValue,
-      v => { lastValue = v; const a = findAspect(); if (a) a.value = v; },
-      { w: 'w-16 text-right' }) as HTMLInputElement;
-    const suffix = el('span', { class: 'text-zinc-500 text-sm' }, '%');
-    aspectRow.append(prefix, input, suffix);
-    // Optional descriptor text input. Stored as a label suffix so users remember which aspect this is.
-    const desc = el('input', { type: 'text', placeholder: 'e.g. of Berserk Ripping, Herald of Zakarum unique', class: inputCls() + ' flex-1 min-w-0 text-xs' }) as HTMLInputElement;
-    // Pull the descriptor out of the label if present (label format: 'Legendary Aspect: <desc>' for backward-compat support).
-    desc.value = existingAspect ? (existingAspect.label && existingAspect.label.startsWith(ASPECT_LABEL_KEY + ':') ? existingAspect.label.slice(ASPECT_LABEL_KEY.length + 1).trim() : '') : '';
-    desc.addEventListener('input', () => {
-      const a = findAspect();
-      if (a) {
-        a.label = desc.value.trim() ? `${ASPECT_LABEL_KEY}: ${desc.value.trim()}` : ASPECT_LABEL_KEY;
-        afterInput();
-      }
-    });
-    aspectRow.append(desc);
-
-    const applyAspectDisabled = () => {
-      input.disabled = !cb.checked;
-      desc.disabled = !cb.checked;
-      const dim = !cb.checked;
-      input.classList.toggle('opacity-40', dim);
-      desc.classList.toggle('opacity-40', dim);
-      prefix.classList.toggle('opacity-40', dim);
-      suffix.classList.toggle('opacity-40', dim);
-    };
-    applyAspectDisabled();
-
-    cb.addEventListener('change', () => {
-      const existing = findAspect();
-      if (cb.checked && !existing) {
-        const label = desc.value.trim() ? `${ASPECT_LABEL_KEY}: ${desc.value.trim()}` : ASPECT_LABEL_KEY;
-        slot.affixes.push({ bucket: 'EXTRAMULT', value: lastValue, label });
-      } else if (!cb.checked && existing) {
-        lastValue = existing.value;
-        lastLabel = existing.label ?? ASPECT_LABEL_KEY;
-        slot.affixes.splice(slot.affixes.indexOf(existing), 1);
-      }
-      applyAspectDisabled();
-      input.value = String((findAspect()?.value ?? lastValue) * 100);
-      afterInput();
-    });
-
-    wrap.append(aspectRow);
-  }
 
   return wrap;
 }
@@ -943,7 +928,7 @@ function statsCard() {
 
   // --- Custom buckets last (matches dropdown order with Custom [+]% / [x]% at end) ---
   if (otherAdditive !== 0) stats.push(['Other additive damage (Custom +%)', bonus(otherAdditive)]);
-  if (c.extraMultProduct !== 1) stats.push(['Standalone Multipliers combined (Custom x%)', `×${c.extraMultProduct.toFixed(2)}`]);
+  if (c.extraMultProduct !== 1) stats.push(['Combined [x]% multipliers (aspects, paragon, set, etc.)', `×${c.extraMultProduct.toFixed(2)}`]);
   const tbl = el('table', { class: 'w-full text-xs' });
   for (const [l, v] of stats) {
     tbl.append(el('tr', {},

@@ -47,7 +47,7 @@
         {
           "bucket": "EXTRAMULT",
           "value": 0.8,
-          "label": "Heir of Perdition x80% damage"
+          "label": "Legendary Aspect: Heir of Perdition (unique) x80% damage"
         }
       ]
     },
@@ -113,7 +113,7 @@
         {
           "bucket": "EXTRAMULT",
           "value": 0.56,
-          "label": "Lagera's Sovereignty x56% Disciple"
+          "label": "Legendary Aspect: Lagera\u2019s Sovereignty (unique) x56% Disciple"
         }
       ]
     },
@@ -140,7 +140,7 @@
         {
           "bucket": "EXTRAMULT",
           "value": 0.674,
-          "label": "Eagle's Eye x87% CSD * 77.5% block"
+          "label": "Legendary Aspect: Eagle\u2019s Eye x87% CSD \u00d7 77.5% block"
         }
       ]
     },
@@ -205,7 +205,7 @@
         {
           "bucket": "EXTRAMULT",
           "value": 0.98,
-          "label": "Herald's Morningstar x98% Blessed Hammer"
+          "label": "Legendary Aspect: Herald\u2019s Morningstar (unique) x98% Blessed Hammer"
         }
       ]
     },
