@@ -38,9 +38,12 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string,
 }
 
 function inputCls() { return 'bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-sm text-zinc-200 focus:outline-none focus:border-amber-600'; }
-function sectionCard(title: string, subtitle?: string) {
+function sectionCard(title: string, subtitle?: string, headerRight?: HTMLElement) {
   const card = el('section', { class: 'bg-zinc-900/50 border border-zinc-800 rounded-lg p-4' });
-  card.append(el('h2', { class: 'text-sm font-semibold text-zinc-300 uppercase tracking-wide mb-1' }, title));
+  const headerRow = el('div', { class: 'flex items-start justify-between gap-3 mb-1' });
+  headerRow.append(el('h2', { class: 'text-sm font-semibold text-zinc-300 uppercase tracking-wide' }, title));
+  if (headerRight) headerRow.append(headerRight);
+  card.append(headerRow);
   if (subtitle) card.append(el('p', { class: 'text-xs text-zinc-500 mb-3' }, subtitle));
   else card.append(el('div', { class: 'mb-3' }));
   return card;
@@ -533,7 +536,27 @@ function slotBlock(slot: Slot) {
 const scenarioState = { vulnerable: true, elites: true, close: false, distant: false, cc: false };
 
 function scenariosCard() {
-  const card = sectionCard('Damage');
+  // Build the DoT mode switch upfront so we can mount it in the card header.
+  // Switch (track + thumb) rather than another pill: it communicates a binary mode toggle better
+  // than the chips do, and clearly distinguishes itself from the per-target chips below.
+  const dotOn = build.disableCrit;
+  const dotSwitch = el('button', {
+    type: 'button',
+    role: 'switch',
+    'aria-checked': dotOn ? 'true' : 'false',
+    title: 'DoT skills (Poison Spray, Bleed, Ignite, etc.) cannot crit. Switches into DoT tick mode: primary readout becomes the DoT tick, additive lines marked “Damage Over Time” apply, and Upgrade Priority swaps crit-centric affixes for DoT-centric ones.',
+    class: 'group inline-flex items-center gap-2 select-none cursor-pointer text-xs font-medium ' +
+      (dotOn ? 'text-emerald-300' : 'text-zinc-400 hover:text-zinc-200'),
+  },
+    el('span', { class: 'normal-case tracking-normal' }, 'DoT skill'),
+    el('span', { class: 'relative inline-block w-9 h-5 rounded-full transition ' +
+      (dotOn ? 'bg-emerald-500/70' : 'bg-zinc-700 group-hover:bg-zinc-600') },
+      el('span', { class: 'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-zinc-100 shadow transition-transform ' + (dotOn ? 'translate-x-4' : 'translate-x-0') }),
+    ),
+  );
+  dotSwitch.addEventListener('click', () => { build.disableCrit = !build.disableCrit; persist(build); mount(); });
+
+  const card = sectionCard('Damage', undefined, dotSwitch);
   const c = calc(build);
   if (c.weaponDmg === 0) {
     card.append(el('p', { class: 'text-xs text-amber-400' }, '⚠️ Pick a weapon type in your weapon slot to enable damage output.'));
@@ -580,24 +603,19 @@ function scenariosCard() {
   }
   card.append(row);
 
-  // Average band: framed strip under the readouts so the headline number sits in its own zone
-  // instead of trailing off as small text. Crit-chance shown as a dim pill on the left.
+  // Average line: clean centered row under Hit/Crit. No frame; the cells above already provide structure.
+  // We render the avg number itself in zinc-100 (matches Hit) so it doesn't compete with the bold amber Crit value;
+  // crit-chance label sits inline as dim caption text.
   if (!isDotMode) {
     const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
-    const avgBand = el('div', { class: 'mt-1 mb-3 px-3 py-2 flex items-center justify-between gap-3' });
-    avgBand.append(el('div', { class: 'flex items-center gap-2 min-w-0' },
-      el('span', { class: 'text-[10px] uppercase tracking-wider text-zinc-500' }, 'Average'),
-      el('span', { class: 'text-[10px] text-zinc-500 tabular-nums' }, `· ${(c.critChance*100).toFixed(1)}% crit`),
+    card.append(el('div', { class: 'mt-2 mb-1 flex items-baseline justify-center gap-2' },
+      el('span', { class: 'text-[11px] text-zinc-500' }, `Average @ ${(c.critChance*100).toFixed(1)}% crit`),
+      el('span', { class: 'text-lg font-bold font-mono text-zinc-100 tabular-nums' }, fmtBigNum(avg)),
     ));
-    avgBand.append(el('span', { class: 'text-xl sm:text-2xl font-bold font-mono text-amber-300 tabular-nums' }, fmtBigNum(avg)));
-    card.append(avgBand);
   }
 
-  // ----- Controls below the answer: target chips, then mode chip. -----
-  // Conditional toggles styled as pill chips: active = amber, inactive = zinc.
-  const togglesRow = el('div', { class: 'pt-3 mt-1 border-t border-zinc-800/80 flex items-center gap-2 flex-wrap' });
-  togglesRow.append(el('span', { class: 'text-[10px] uppercase tracking-wide text-zinc-500 mr-1' }, 'Target'));
-  const chipsWrap = el('div', { class: 'flex flex-wrap gap-1.5' });
+  // ----- Target chips under the readouts. The DoT mode switch lives in the card header above. -----
+  const togglesRow = el('div', { class: 'pt-3 mt-2 border-t border-zinc-800/80 flex flex-wrap gap-1.5' });
   const toggles: { key: keyof typeof scenarioState; label: string }[] = [
     { key: 'vulnerable', label: 'Vulnerable' },
     { key: 'elites',     label: 'Elite' },
@@ -616,32 +634,9 @@ function scenariosCard() {
           : 'bg-zinc-800/60 text-zinc-400 border-zinc-700 hover:bg-zinc-800 hover:text-zinc-200'),
     }, t.label);
     chip.addEventListener('click', () => { scenarioState[t.key] = !scenarioState[t.key]; refreshOutputs(); });
-    chipsWrap.append(chip);
+    togglesRow.append(chip);
   }
-  togglesRow.append(chipsWrap);
   card.append(togglesRow);
-
-  // DoT-build mode pill: own row so it reads as a build-wide mode switch, not just another conditional.
-  {
-    const dotRow = el('div', { class: 'mt-2 flex items-center gap-2 flex-wrap' });
-    dotRow.append(el('span', { class: 'text-[10px] uppercase tracking-wide text-zinc-500 mr-1' }, 'Mode'));
-    const on = build.disableCrit;
-    const dotChip = el('button', {
-      type: 'button',
-      'aria-pressed': on ? 'true' : 'false',
-      title: 'DoT skills (Poison Spray, Bleed, Ignite, etc.) cannot crit. Switches into DoT tick mode: primary readout becomes the DoT tick, additive lines marked “Damage Over Time” apply, and Upgrade Priority swaps crit-centric affixes for DoT-centric ones.',
-      class: 'px-3 py-1 rounded-full text-xs font-medium transition border inline-flex items-center gap-1.5 ' +
-        (on
-          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
-          : 'bg-zinc-800/60 text-zinc-400 border-zinc-700 hover:bg-zinc-800 hover:text-zinc-200'),
-    },
-      el('span', { class: 'text-sm leading-none' }, on ? '●' : '○'),
-      document.createTextNode('DoT skill (no crit)'),
-    );
-    dotChip.addEventListener('click', () => { build.disableCrit = !build.disableCrit; persist(build); mount(); });
-    dotRow.append(dotChip);
-    card.append(dotRow);
-  }
 
   // Snapshot delta. Compare on the same basis as the primary readout (DoT tick vs hit) so the % delta is meaningful.
   if (build.snapshot) {
