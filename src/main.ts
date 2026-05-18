@@ -538,36 +538,57 @@ function scenariosCard() {
     return card;
   }
 
-  // Conditional toggles (match the in-game conditional additive lines so the user can flip context without leaving the card)
-  const toggleWrap = el('div', { class: 'flex flex-wrap gap-x-3 gap-y-1 mb-3' });
+  // Conditional toggles styled as pill chips: active = amber, inactive = zinc.
+  // Reads as a single "Target:" row, matching how the in-game conditional additive lines are framed.
+  const togglesRow = el('div', { class: 'mb-3 flex items-center gap-2 flex-wrap' });
+  togglesRow.append(el('span', { class: 'text-[10px] uppercase tracking-wide text-zinc-500 mr-1' }, 'Target'));
+  const chipsWrap = el('div', { class: 'flex flex-wrap gap-1.5' });
   const toggles: { key: keyof typeof scenarioState; label: string }[] = [
     { key: 'vulnerable', label: 'Vulnerable' },
     { key: 'elites',     label: 'Elite' },
     { key: 'close',      label: 'Close' },
     { key: 'distant',    label: 'Distant' },
-    { key: 'cc',         label: 'Crowd-Controlled' },
+    { key: 'cc',         label: 'CC' },
     { key: 'healthy',    label: 'Healthy' },
   ];
   for (const t of toggles) {
-    const lbl = el('label', { class: 'flex items-center gap-1 text-xs text-zinc-400 cursor-pointer' });
-    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
-    cb.checked = !!scenarioState[t.key];
-    cb.addEventListener('change', () => { scenarioState[t.key] = cb.checked; refreshOutputs(); });
-    lbl.append(cb, document.createTextNode(t.label));
-    toggleWrap.append(lbl);
+    const active = !!scenarioState[t.key];
+    const chip = el('button', {
+      type: 'button',
+      'aria-pressed': active ? 'true' : 'false',
+      class: 'px-2.5 py-1 rounded-full text-xs font-medium transition border ' +
+        (active
+          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+          : 'bg-zinc-800/60 text-zinc-400 border-zinc-700 hover:bg-zinc-800 hover:text-zinc-200'),
+    }, t.label);
+    chip.addEventListener('click', () => { scenarioState[t.key] = !scenarioState[t.key]; refreshOutputs(); });
+    chipsWrap.append(chip);
   }
-  // DoT-build toggle: persisted on the build so the rest of the UI (Upgrade Priority, Stats Summary, Formula)
-  // can swap out crit-centric rows for DoT-centric ones. Mechanically: zeroes crit chance for all
-  // calc paths and treats the primary readout as a DoT tick (no crit/avg).
+  togglesRow.append(chipsWrap);
+  card.append(togglesRow);
+
+  // DoT-build mode pill: separate row so it reads as a build-wide mode switch, not just another conditional.
+  // Emerald accent when on, neutral when off.
   {
-    const lbl = el('label', { class: 'flex items-center gap-1 text-xs text-amber-300 cursor-pointer', title: 'DoT skills (Poison Spray, Bleed, Ignite, etc.) cannot crit. Switches the calculator into DoT tick mode: primary readout becomes the DoT tick, additive lines marked “Damage Over Time” get applied, and Upgrade Priority swaps crit-centric affixes for DoT-centric ones.' });
-    const cb = el('input', { type: 'checkbox', class: 'accent-amber-500' }) as HTMLInputElement;
-    cb.checked = build.disableCrit;
-    cb.addEventListener('change', () => { build.disableCrit = cb.checked; persist(build); mount(); });
-    lbl.append(cb, document.createTextNode('DoT skill (no crit, use DoT tick)'));
-    toggleWrap.append(lbl);
+    const dotRow = el('div', { class: 'mb-4 flex items-center gap-2 flex-wrap' });
+    dotRow.append(el('span', { class: 'text-[10px] uppercase tracking-wide text-zinc-500 mr-1' }, 'Mode'));
+    const on = build.disableCrit;
+    const dotChip = el('button', {
+      type: 'button',
+      'aria-pressed': on ? 'true' : 'false',
+      title: 'DoT skills (Poison Spray, Bleed, Ignite, etc.) cannot crit. Switches into DoT tick mode: primary readout becomes the DoT tick, additive lines marked “Damage Over Time” apply, and Upgrade Priority swaps crit-centric affixes for DoT-centric ones.',
+      class: 'px-3 py-1 rounded-full text-xs font-medium transition border inline-flex items-center gap-1.5 ' +
+        (on
+          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
+          : 'bg-zinc-800/60 text-zinc-400 border-zinc-700 hover:bg-zinc-800 hover:text-zinc-200'),
+    },
+      el('span', { class: 'text-sm leading-none' }, on ? '●' : '○'),
+      document.createTextNode('DoT skill (no crit)'),
+    );
+    dotChip.addEventListener('click', () => { build.disableCrit = !build.disableCrit; persist(build); mount(); });
+    dotRow.append(dotChip);
+    card.append(dotRow);
   }
-  card.append(toggleWrap);
 
   // Compute scenarios. In DoT-build mode we don't show crit/avg; the primary readout IS the DoT tick.
   const conds = { ...scenarioState };
@@ -581,37 +602,37 @@ function scenariosCard() {
   const dotLinesSum = build.additiveLines.filter(l => (l as any).isDotOnly).reduce((s, l) => s + l.value, 0);
   const showDotReadout = !isDotMode && (c.dotm > 1 || dotLinesSum > 0);
 
-  // Big readout (matches in-game: white = hit, yellow = crit, emerald = DoT tick).
-  // DoT mode collapses to a single emerald DoT tick number; non-DoT shows Hit / Crit (+ optional DoT tick).
+  // Big readout. Each cell sits in its own subtle card so the numbers feel grouped instead of
+  // floating in space. Hit / Crit / DoT colors match in-game text colors.
+  const readoutCellCls = 'rounded-lg bg-zinc-950/40 border border-zinc-800/80 px-3 py-3 text-center';
+  const labelCls = 'text-[10px] uppercase tracking-wider text-zinc-500 mb-1';
+  const cell = (label: string, value: string, valueCls: string, title?: string) => {
+    const attrs: any = { class: readoutCellCls };
+    if (title) attrs.title = title;
+    return el('div', attrs,
+      el('div', { class: labelCls }, label),
+      el('div', { class: 'text-2xl sm:text-3xl font-bold font-mono leading-tight ' + valueCls }, value),
+    );
+  };
   let row: HTMLElement;
   if (isDotMode) {
-    row = el('div', { class: 'grid grid-cols-1 gap-3 mb-1' });
-    row.append(el('div', { class: 'text-center', title: 'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied. Vulnerable / conditional toggles still apply.' },
-      el('div', { class: 'text-xs text-zinc-500' }, 'DoT tick'),
-      el('div', { class: 'text-3xl font-bold text-emerald-400 font-mono' }, fmtBigNum(dotDmg)),
-    ));
+    row = el('div', { class: 'grid grid-cols-1 gap-2 mb-1' });
+    row.append(cell('DoT tick', fmtBigNum(dotDmg), 'text-emerald-400',
+      'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied. Vulnerable / conditional toggles still apply.'));
   } else {
-    row = el('div', { class: showDotReadout ? 'grid grid-cols-3 gap-3 mb-1' : 'grid grid-cols-2 gap-3 mb-1' });
-    row.append(el('div', { class: 'text-center' },
-      el('div', { class: 'text-xs text-zinc-500' }, 'Hit'),
-      el('div', { class: 'text-2xl font-bold text-zinc-100 font-mono' }, fmtBigNum(hitDmg)),
-    ));
-    row.append(el('div', { class: 'text-center' },
-      el('div', { class: 'text-xs text-zinc-500' }, 'Crit'),
-      el('div', { class: 'text-2xl font-bold text-amber-400 font-mono' }, fmtBigNum(critDmg)),
-    ));
+    row = el('div', { class: showDotReadout ? 'grid grid-cols-3 gap-2 mb-1' : 'grid grid-cols-2 gap-2 mb-1' });
+    row.append(cell('Hit',  fmtBigNum(hitDmg),  'text-zinc-100'));
+    row.append(cell('Crit', fmtBigNum(critDmg), 'text-amber-400'));
     if (showDotReadout) {
-      row.append(el('div', { class: 'text-center', title: 'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied.' },
-        el('div', { class: 'text-xs text-zinc-500' }, 'DoT tick'),
-        el('div', { class: 'text-2xl font-bold text-emerald-400 font-mono' }, fmtBigNum(dotDmg)),
-      ));
+      row.append(cell('DoT tick', fmtBigNum(dotDmg), 'text-emerald-400',
+        'DoT tick: non-crit hit × Damage Over Time Multiplier, with DoT-only additive lines applied.'));
     }
   }
   card.append(row);
 
   if (!isDotMode) {
     const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
-    card.append(el('div', { class: 'text-center text-sm text-zinc-300 mt-1.5' },
+    card.append(el('div', { class: 'text-center text-sm text-zinc-300 mt-2.5' },
       el('span', { class: 'text-xs text-zinc-500' }, `Average @ ${(c.critChance*100).toFixed(1)}% crit → `),
       el('span', { class: 'text-zinc-100 font-mono font-semibold' }, fmtBigNum(avg)),
     ));
