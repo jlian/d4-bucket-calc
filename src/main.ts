@@ -17,9 +17,11 @@ const fmtPct = (n: number, digits = 2) => (n * 100).toFixed(digits) + '%';
 const fmtNum = (n: number, digits = 0) => n.toLocaleString('en-US', { maximumFractionDigits: digits });
 const fmtBigNum = (n: number) => {
   if (!isFinite(n) || n === 0) return '0';
-  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+  if (n >= 1e15) return (n / 1e15).toFixed(2) + 'Q';   // quadrillions
+  if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';   // trillions
+  if (n >= 1e9)  return (n / 1e9).toFixed(2)  + 'B';
+  if (n >= 1e6)  return (n / 1e6).toFixed(2)  + 'M';
+  if (n >= 1e3)  return (n / 1e3).toFixed(2)  + 'K';
   return fmtNum(n, 0);
 };
 const stripTrailingZero = (s: string) => s.includes('.') ? s.replace(/\.?0+$/, '') : s;
