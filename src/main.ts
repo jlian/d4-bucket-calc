@@ -582,10 +582,10 @@ function scenariosCard() {
   // instead of trailing off as small text. Crit-chance shown as a dim pill on the left.
   if (!isDotMode) {
     const avg = critDmg * c.critChance + hitDmg * (1 - c.critChance);
-    const avgBand = el('div', { class: 'mt-1 mb-3 rounded-lg bg-amber-500/5 border border-amber-500/20 px-3 py-2 flex items-center justify-between gap-3' });
-    avgBand.append(el('div', { class: 'flex items-center gap-2' },
-      el('span', { class: labelCls + ' !mb-0' }, 'Average'),
-      el('span', { class: 'text-[10px] text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-800/80 tabular-nums' }, `${(c.critChance*100).toFixed(1)}% crit`),
+    const avgBand = el('div', { class: 'mt-1 mb-3 px-3 py-2 flex items-center justify-between gap-3' });
+    avgBand.append(el('div', { class: 'flex items-center gap-2 min-w-0' },
+      el('span', { class: 'text-[10px] uppercase tracking-wider text-zinc-500' }, 'Average'),
+      el('span', { class: 'text-[10px] text-zinc-500 tabular-nums' }, `· ${(c.critChance*100).toFixed(1)}% crit`),
     ));
     avgBand.append(el('span', { class: 'text-xl sm:text-2xl font-bold font-mono text-amber-300 tabular-nums' }, fmtBigNum(avg)));
     card.append(avgBand);
