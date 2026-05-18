@@ -517,7 +517,8 @@ function slotBlock(slot: Slot) {
   // EXTRAMULT affix with the well-known label "Legendary Aspect" so we can find / round-trip it.
   if (isGearSlot) {
     const ASPECT_LABEL_KEY = 'Legendary Aspect';
-    const findAspect = () => slot.affixes.find(a => a.bucket === 'EXTRAMULT' && a.label === ASPECT_LABEL_KEY);
+    // Match either the bare key or any `Legendary Aspect: <descriptor>` variant (label format used when the user adds a description).
+    const findAspect = () => slot.affixes.find(a => a.bucket === 'EXTRAMULT' && !!a.label && (a.label === ASPECT_LABEL_KEY || a.label.startsWith(ASPECT_LABEL_KEY + ':')));
     const existingAspect = findAspect();
     let lastValue = existingAspect?.value ?? 0;
     let lastLabel = existingAspect?.label ?? ASPECT_LABEL_KEY;
