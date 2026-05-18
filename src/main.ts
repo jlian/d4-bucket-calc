@@ -454,10 +454,10 @@ function slotBlock(slot: Slot) {
   // them in weapon slots; calc still sums them so damage numbers don't change silently.
   const isLegacyWeaponGem = (a: { bucket: Bucket; label?: string }) =>
     isWeaponGemSlot && a.bucket === 'GEM' && !WEAPON_GEM_LABELS.includes(a.label ?? '');
-  // Hide the pinned legendary aspect EXTRAMULT (matched by label prefix) so it doesn't double-render in the affix list.
+  // Hide the pinned legendary aspect (matched by label prefix, any bucket) so it doesn't double-render in the affix list.
   const ASPECT_LABEL_KEY = 'Legendary Aspect';
   const isPinnedAspect = (a: { bucket: Bucket; label?: string }) =>
-    a.bucket === 'EXTRAMULT' && !!a.label && (a.label === ASPECT_LABEL_KEY || a.label.startsWith(ASPECT_LABEL_KEY + ':'));
+    !!a.label && (a.label === ASPECT_LABEL_KEY || a.label.startsWith(ASPECT_LABEL_KEY + ':'));
   const visibleAffixes = slot.affixes.map((a, i) => ({ a, i })).filter(({ a }) => !isHiddenGemAffix(a) && !isLegacyWeaponGem(a) && !isPinnedAspect(a));
 
   if (visibleAffixes.length === 0) wrap.append(el('p', { class: 'text-xs text-zinc-600 italic' }, 'No affixes.'));
@@ -516,29 +516,64 @@ function slotBlock(slot: Slot) {
   // Same UX as gem rows: checkbox to enable, x% input, label input. Stored as a slot-local
   // EXTRAMULT affix with the well-known label "Legendary Aspect" so we can find / round-trip it.
   if (isGearSlot) {
+    // Aspect-by-label lookup (any bucket). Behaves like a regular affix slot but pinned, with a bucket dropdown.
+    // Most aspects are EXTRAMULT (Custom [x]%), but some apply to MAINSTAT_PCT, CSDM, ADDITIVE, etc. —
+    // matching the in-game variety where Eagle's Eye adds to crit damage multiplier, Herald of Zakarum's unique
+    // adds +% main stat, etc.
     const ASPECT_LABEL_KEY = 'Legendary Aspect';
-    // Match either the bare key or any `Legendary Aspect: <descriptor>` variant (label format used when the user adds a description).
-    const findAspect = () => slot.affixes.find(a => a.bucket === 'EXTRAMULT' && !!a.label && (a.label === ASPECT_LABEL_KEY || a.label.startsWith(ASPECT_LABEL_KEY + ':')));
+    const findAspect = () => slot.affixes.find(a => !!a.label && (a.label === ASPECT_LABEL_KEY || a.label.startsWith(ASPECT_LABEL_KEY + ':')));
     const existingAspect = findAspect();
     let lastValue = existingAspect?.value ?? 0;
-    let lastLabel = existingAspect?.label ?? ASPECT_LABEL_KEY;
-    void lastLabel;
+    let lastBucket: Bucket = existingAspect?.bucket ?? 'EXTRAMULT';
+
     const aspectRow = el('div', { class: 'flex items-center gap-2 mb-1 mt-1 pt-1 border-t border-zinc-800/60 text-sm flex-wrap sm:flex-nowrap' });
     const cb = el('input', { type: 'checkbox', class: 'accent-amber-500 shrink-0' }) as HTMLInputElement;
     cb.checked = !!existingAspect;
     aspectRow.append(cb);
-    aspectRow.append(el('span', { class: 'text-zinc-400 w-16 shrink-0', title: 'Legendary aspect (or unique effect) on this item. Most are an x% multiplier (own bucket). Enter the % from the aspect tooltip.' }, 'Aspect'));
-    const prefix = el('span', { class: 'text-zinc-500 text-sm' }, 'x');
-    const input = pctInput(
-      () => findAspect()?.value ?? lastValue,
-      v => { lastValue = v; const a = findAspect(); if (a) a.value = v; },
-      { w: 'w-16 text-right' }) as HTMLInputElement;
-    const suffix = el('span', { class: 'text-zinc-500 text-sm' }, '%');
-    aspectRow.append(prefix, input, suffix);
-    // Optional descriptor text input. Stored as a label suffix so users remember which aspect this is.
-    const desc = el('input', { type: 'text', placeholder: 'e.g. of Berserk Ripping, Herald of Zakarum unique', class: inputCls() + ' flex-1 min-w-0 text-xs' }) as HTMLInputElement;
-    // Pull the descriptor out of the label if present (label format: 'Legendary Aspect: <desc>' for backward-compat support).
-    desc.value = existingAspect ? (existingAspect.label && existingAspect.label.startsWith(ASPECT_LABEL_KEY + ':') ? existingAspect.label.slice(ASPECT_LABEL_KEY.length + 1).trim() : '') : '';
+    aspectRow.append(el('span', { class: 'text-zinc-400 w-16 shrink-0', title: 'Legendary aspect (or unique effect) on this item. Pick the bucket the aspect contributes to (most are Custom [x]%; some add to crit damage / main stat / etc.).' }, 'Aspect'));
+
+    // Bucket dropdown — same options as a regular affix row, same sort.
+    const bucketSel = el('select', { class: inputCls() + ' text-xs w-auto sm:w-auto min-w-0 max-w-[12rem]' }) as HTMLSelectElement;
+    const aspectCandidates = BUCKET_ORDER.filter(b => {
+      if (b === 'GEM') return false;
+      if (b === 'WEPDMG' && !isWeapon) return false;
+      return true;
+    });
+    const customBuckets = new Set<Bucket>(['ADDITIVE', 'EXTRAMULT']);
+    aspectCandidates.sort((x, y) => {
+      const xc = customBuckets.has(x), yc = customBuckets.has(y);
+      if (xc !== yc) return xc ? -1 : 1; // custom buckets FIRST in aspect dropdown since they're the common case
+      return BUCKET_META[x].label.localeCompare(BUCKET_META[y].label);
+    });
+    for (const b of aspectCandidates) {
+      const opt = el('option', { value: b }, BUCKET_META[b].label);
+      if (b === lastBucket) opt.setAttribute('selected', '');
+      bucketSel.append(opt);
+    }
+    aspectRow.append(bucketSel);
+
+    // Value input (% for percent buckets, raw number otherwise) + unit suffix.
+    // We rebuild this input when the bucket changes so isPercent stays consistent.
+    const valWrap = el('div', { class: 'flex items-center gap-1 shrink-0' });
+    let valInput: HTMLInputElement;
+    let unitSpan: HTMLSpanElement;
+    const buildValInput = () => {
+      valWrap.innerHTML = '';
+      const isPct = BUCKET_META[lastBucket].isPercent;
+      valInput = (isPct
+        ? pctInput(() => findAspect()?.value ?? lastValue, v => { lastValue = v; const a = findAspect(); if (a) a.value = v; }, { w: 'w-20 text-right' })
+        : numInput(() => findAspect()?.value ?? lastValue, v => { lastValue = v; const a = findAspect(); if (a) a.value = v; }, { w: 'w-20 text-right' })) as HTMLInputElement;
+      valWrap.append(valInput);
+      unitSpan = el('span', { class: 'text-zinc-600 text-xs w-3 inline-block' }, isPct ? '%' : '') as HTMLSpanElement;
+      valWrap.append(unitSpan);
+      applyAspectDisabled();
+    };
+
+    // Optional descriptor (free text). Stored in the label as `Legendary Aspect: <desc>`.
+    const desc = el('input', { type: 'text', placeholder: 'e.g. of Berserk Ripping, Edgemaster\u2019s', class: inputCls() + ' flex-1 min-w-0 text-xs' }) as HTMLInputElement;
+    desc.value = existingAspect && existingAspect.label && existingAspect.label.startsWith(ASPECT_LABEL_KEY + ':')
+      ? existingAspect.label.slice(ASPECT_LABEL_KEY.length + 1).trim()
+      : '';
     desc.addEventListener('input', () => {
       const a = findAspect();
       if (a) {
@@ -546,31 +581,43 @@ function slotBlock(slot: Slot) {
         afterInput();
       }
     });
-    aspectRow.append(desc);
 
     const applyAspectDisabled = () => {
-      input.disabled = !cb.checked;
-      desc.disabled = !cb.checked;
       const dim = !cb.checked;
-      input.classList.toggle('opacity-40', dim);
+      bucketSel.disabled = dim;
+      desc.disabled = dim;
+      if (valInput) valInput.disabled = dim;
+      bucketSel.classList.toggle('opacity-40', dim);
       desc.classList.toggle('opacity-40', dim);
-      prefix.classList.toggle('opacity-40', dim);
-      suffix.classList.toggle('opacity-40', dim);
+      if (valInput) valInput.classList.toggle('opacity-40', dim);
+      if (unitSpan) unitSpan.classList.toggle('opacity-40', dim);
     };
+
+    buildValInput();
+    aspectRow.append(valWrap);
+    aspectRow.append(desc);
     applyAspectDisabled();
+
+    bucketSel.addEventListener('change', () => {
+      lastBucket = bucketSel.value as Bucket;
+      const a = findAspect();
+      if (a) a.bucket = lastBucket;
+      buildValInput();
+      afterInput();
+    });
 
     cb.addEventListener('change', () => {
       const existing = findAspect();
       if (cb.checked && !existing) {
         const label = desc.value.trim() ? `${ASPECT_LABEL_KEY}: ${desc.value.trim()}` : ASPECT_LABEL_KEY;
-        slot.affixes.push({ bucket: 'EXTRAMULT', value: lastValue, label });
+        slot.affixes.push({ bucket: lastBucket, value: lastValue, label });
       } else if (!cb.checked && existing) {
         lastValue = existing.value;
-        lastLabel = existing.label ?? ASPECT_LABEL_KEY;
+        lastBucket = existing.bucket;
         slot.affixes.splice(slot.affixes.indexOf(existing), 1);
       }
       applyAspectDisabled();
-      input.value = String((findAspect()?.value ?? lastValue) * 100);
+      if (valInput) valInput.value = BUCKET_META[lastBucket].isPercent ? String((findAspect()?.value ?? lastValue) * 100) : String(findAspect()?.value ?? lastValue);
       afterInput();
     });
 

@@ -138,7 +138,7 @@
           "value": 1.0
         },
         {
-          "bucket": "EXTRAMULT",
+          "bucket": "CSDM",
           "value": 0.674,
           "label": "Legendary Aspect: Eagle\u2019s Eye x87% CSD \u00d7 77.5% block"
         }
@@ -233,7 +233,7 @@
         {
           "bucket": "MAINSTAT_PCT",
           "value": 0.5,
-          "label": "Herald of Zakarum x50% Strength"
+          "label": "Legendary Aspect: Herald of Zakarum +50% Str (unique)"
         },
         {
           "bucket": "MAINSTAT",
