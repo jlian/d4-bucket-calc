@@ -1124,7 +1124,9 @@ function buildPluggedIn(): HTMLElement {
   const csdmMath = bucketBreakdownMath(build, 'CSDM');
   const vdmMath = bucketBreakdownMath(build, 'VDM');
   const allmMath = bucketBreakdownMath(build, 'ALLM');
-  const wepDmgPctSum = build.slots.reduce((s, slot) => s + slot.affixes.filter(a => a.bucket === 'WEPDMG_PCT').reduce((ss, a) => ss + a.value, 0), 0);
+  const manualWepDmgPctSum = build.slots.reduce((s, slot) => s + slot.affixes.filter(a => a.bucket === 'WEPDMG_PCT').reduce((ss, a) => ss + a.value, 0), 0);
+  const shieldInnateWepDmgPct = build.slots.some(s => s.weaponTypeId === 'shield') ? 1.0 : 0;
+  const wepDmgPctSum = manualWepDmgPctSum + shieldInnateWepDmgPct;
   const rows: Row[] = [
     ['W',
       wepDmgPctSum > 0
