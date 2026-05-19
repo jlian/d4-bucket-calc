@@ -599,8 +599,15 @@ function slotBlock(slot: Slot) {
     applyAspectDisabled();
 
     bucketSel.addEventListener('change', () => {
+      const prevBucket = lastBucket;
       lastBucket = bucketSel.value as Bucket;
       const a = findAspect();
+      // Resetting value when crossing the percent/raw boundary avoids silently turning e.g.
+      // a +200 MAINSTAT aspect into a +20000% EXTRAMULT (or a 0.5 EXTRAMULT into +0.5 WEPDMG).
+      if (BUCKET_META[prevBucket].isPercent !== BUCKET_META[lastBucket].isPercent) {
+        lastValue = 0;
+        if (a) a.value = 0;
+      }
       if (a) a.bucket = lastBucket;
       buildValInput();
       afterInput();
